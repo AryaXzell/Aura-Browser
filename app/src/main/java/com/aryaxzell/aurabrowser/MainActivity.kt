@@ -113,9 +113,8 @@ fun BrowserApp(viewModel: BrowserViewModel) {
     val isBookmarked = bookmarks.any { it.url == activeTab.url && activeTab.url.isNotBlank() }
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars),
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             BrowserTopBar(
                 activeTab = activeTab,
@@ -188,7 +187,10 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                         onShortcutClick = { url -> viewModel.loadUrl(url) },
                         onAddShortcutClick = { viewModel.setAddShortcutDialogVisible(true) },
                         onHistoryItemClick = { url -> viewModel.loadUrl(url) },
-                        onBookmarkItemClick = { url -> viewModel.loadUrl(url) }
+                        onBookmarkItemClick = { url -> viewModel.loadUrl(url) },
+                        onOpenDownloads = { viewModel.setDownloadsSheetVisible(true) },
+                        onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
+                        onOpenHistory = { viewModel.setHistorySheetVisible(true) }
                     )
                 } else if (tabToRender.url == "aurabrowser://downloads") {
                     DownloadsTabContent(

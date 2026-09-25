@@ -180,7 +180,7 @@ fun BrowserBottomBar(
                         imageVector = Icons.Default.Download,
                         contentDescription = "Download Manager",
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(21.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 

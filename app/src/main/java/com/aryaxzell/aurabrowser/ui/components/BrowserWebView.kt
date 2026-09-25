@@ -38,9 +38,12 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,6 +83,7 @@ private val AD_DOMAINS = arrayOf(
 private const val DESKTOP_USER_AGENT =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun BrowserWebView(
@@ -102,6 +106,10 @@ fun BrowserWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var defaultUserAgent by remember { mutableStateOf("") }
     val currentAdBlockState by rememberUpdatedState(isAdBlockEnabled)
+
+    // Pull to Refresh state tied to active tab loading
+    val isRefreshing = activeTab.isLoading
+    val pullToRefreshState = rememberPullToRefreshState()
 
     // Intercept back button for WebView navigation
     BackHandler(enabled = !activeTab.isHome) {
@@ -166,7 +174,14 @@ fun BrowserWebView(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            webViewInstance?.reload()
+        },
+        state = pullToRefreshState,
+        modifier = modifier.fillMaxSize()
+    ) {
         // key ensures separate composition scope per tabId
         key(activeTab.id) {
             AndroidView(

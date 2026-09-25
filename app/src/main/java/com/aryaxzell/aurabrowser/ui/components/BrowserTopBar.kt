@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -98,7 +100,8 @@ fun BrowserTopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
+            .statusBarsPadding()
     ) {
         // Incognito banner indicator
         if (activeTab.isIncognito) {
@@ -127,26 +130,32 @@ fun BrowserTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Main Address Bar pill
+            // Floating Pill Address Bar
             Surface(
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp)
+                    .height(48.dp)
                     .testTag("address_bar_container")
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(CircleShape)
                     .clickable(enabled = !isEditingUrl) {
                         onStartEditingUrl()
                     },
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(22.dp)
+                color = MaterialTheme.colorScheme.surface,
+                shape = CircleShape,
+                tonalElevation = 4.dp,
+                shadowElevation = 6.dp,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+                )
             ) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Security or Search icon
@@ -173,7 +182,7 @@ fun BrowserTopBar(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     if (isEditingUrl) {
                         BasicTextField(
@@ -243,7 +252,7 @@ fun BrowserTopBar(
 
                         Text(
                             text = displayUrl,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = if (activeTab.isHome) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -281,19 +290,35 @@ fun BrowserTopBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // Action: Cancel when editing, or More Menu when browsing
+            // Action Floating Pill: Cancel when editing, or More Menu when browsing
             if (isEditingUrl) {
-                IconButton(
-                    onClick = onCancelEditingUrl,
-                    modifier = Modifier.testTag("cancel_edit_url_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cancel URL edit",
-                        tint = MaterialTheme.colorScheme.onSurface
+                Surface(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 6.dp,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                     )
+                ) {
+                    IconButton(
+                        onClick = onCancelEditingUrl,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("cancel_edit_url_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cancel URL edit",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             } else {
                 TopBarMenu(
@@ -347,15 +372,31 @@ private fun TopBarMenu(
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        IconButton(
-            onClick = { expanded = true },
-            modifier = Modifier.testTag("top_menu_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "Browser options menu",
-                tint = MaterialTheme.colorScheme.onSurface
+        Surface(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 4.dp,
+            shadowElevation = 6.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
             )
+        ) {
+            IconButton(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("top_menu_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Browser options menu",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
 
         // iOS-style contextual dropdown menu

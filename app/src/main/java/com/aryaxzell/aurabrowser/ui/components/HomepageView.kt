@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
@@ -59,11 +60,14 @@ fun HomepageView(
     shortcuts: List<ShortcutItem>,
     recentHistory: List<HistoryEntity>,
     bookmarks: List<BookmarkEntity>,
-    onSearchClick: () -> Unit,
+    onSearchClick: () -> Unit = {},
     onShortcutClick: (String) -> Unit,
     onAddShortcutClick: () -> Unit,
     onHistoryItemClick: (String) -> Unit,
     onBookmarkItemClick: (String) -> Unit,
+    onOpenDownloads: () -> Unit = {},
+    onOpenBookmarks: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val greeting = rememberGreeting()
@@ -103,47 +107,100 @@ fun HomepageView(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Search Bar trigger
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .clip(RoundedCornerShape(27.dp))
-                .clickable { onSearchClick() }
-                .testTag("home_search_bar"),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(27.dp),
-            tonalElevation = 1.dp
+        // Quick Action Chips (Bookmarks, History, Downloads)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            // Bookmarks Quick Button
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onOpenBookmarks() }
+                    .testTag("home_quick_bookmarks"),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "Bookmarks",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Bookmarks",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                Spacer(modifier = Modifier.width(12.dp))
+            // History Quick Button
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onOpenHistory() }
+                    .testTag("home_quick_history"),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = "History",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "History",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                Text(
-                    text = "Search with ${searchEngine.displayName} or enter URL",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            // Downloads Quick Button
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onOpenDownloads() }
+                    .testTag("home_quick_downloads"),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Downloads",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Downloads",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         // Shortcuts Section
         Row(
