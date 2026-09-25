@@ -1,0 +1,61 @@
+name: Android CI Build
+
+on:
+  push:
+    branches: [ "**" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "**" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Package APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Assemble Split and Universal APKs
+        run: ./gradlew assembleDebug -PsplitApks --no-daemon --stacktrace
+
+      - name: Upload ARM64 (64-bit) APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-arm64-v8a
+          path: app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload ARM32 (32-bit) APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-armeabi-v7a-32bit
+          path: app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Universal APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-universal
+          path: app/build/outputs/apk/debug/app-universal-debug.apk
+          if-no-files-found: error
+          retention-days: 14

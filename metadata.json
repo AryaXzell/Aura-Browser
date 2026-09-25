@@ -1,0 +1,6 @@
+{
+  "name": "Aura Browser",
+  "description": "A fast, minimal, and elegant Android web browser powered by Android System WebView.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
