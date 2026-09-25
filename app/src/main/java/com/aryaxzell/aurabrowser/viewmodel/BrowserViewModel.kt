@@ -10,11 +10,15 @@ import com.aryaxzell.aurabrowser.data.db.BrowserDatabase
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
 import com.aryaxzell.aurabrowser.data.download.DownloadTracker
 import com.aryaxzell.aurabrowser.data.model.DownloadItem
+import com.aryaxzell.aurabrowser.data.model.DownloadStatus
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
 import com.aryaxzell.aurabrowser.data.model.ShortcutItem
 import com.aryaxzell.aurabrowser.data.model.TabItem
 import com.aryaxzell.aurabrowser.data.preferences.BrowserPreferences
 import com.aryaxzell.aurabrowser.webview.WebViewPoolManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class BrowserViewModel(application: Application) : AndroidViewModel(application) {
     private val db = BrowserDatabase.getInstance(application)
@@ -33,6 +38,14 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     // Expose preferences as reactive StateFlows
     val searchEngine: StateFlow<SearchEngine> = preferences.searchEngineFlow
     val themeMode: StateFlow<String> = preferences.themeModeFlow
+    val accentColor: StateFlow<String> = preferences.accentColorFlow
+    val showShortcuts: StateFlow<Boolean> = preferences.showShortcutsFlow
+    val showRecentHistory: StateFlow<Boolean> = preferences.showRecentHistoryFlow
+    val tabSwitcherLayout: StateFlow<String> = preferences.tabSwitcherLayoutFlow
+    val bottomBarItems: StateFlow<List<String>> = preferences.bottomBarItemsFlow
+    val wallpaperUri: StateFlow<String?> = preferences.wallpaperUriFlow
+    val isWallpaperBlurEnabled: StateFlow<Boolean> = preferences.isWallpaperBlurEnabledFlow
+    val homeIconUri: StateFlow<String?> = preferences.homeIconUriFlow
     val isAdBlockEnabled: StateFlow<Boolean> = preferences.isAdBlockEnabledFlow
     val isDesktopModeDefault: StateFlow<Boolean> = preferences.isDesktopModeDefaultFlow
     val isJavaScriptEnabled: StateFlow<Boolean> = preferences.isJavaScriptEnabledFlow
@@ -96,8 +109,13 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
 
+    private var downloadPollingJob: Job? = null
+
     init {
-        refreshDownloads()
+        // Load downloads asynchronously — tidak boleh memblokir startup UI thread
+        viewModelScope.launch {
+            refreshDownloads()
+        }
     }
 
     private val _showAddShortcutDialog = MutableStateFlow(false)
@@ -132,12 +150,20 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         _urlInput.value = input
     }
 
+    fun updateUrlInput(input: String) {
+        setUrlInput(input)
+    }
+
     fun setIsEditingUrl(isEditing: Boolean) {
         _isEditingUrl.value = isEditing
         if (isEditing) {
             val active = getActiveTab()
             _urlInput.value = if (active.isHome) "" else active.url
         }
+    }
+
+    fun cancelEditingUrl() {
+        setIsEditingUrl(false)
     }
 
     fun submitQueryOrUrl(queryOrUrl: String) {
@@ -158,6 +184,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun stopLoading() {
         _webAction.value = WebAction.Stop
+    }
+
+    fun stop() {
+        stopLoading()
     }
 
     fun goBack() {
@@ -200,6 +230,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun selectTab(tabId: String) {
+        val previousTab = getActiveTab()
+        if (previousTab.url == "aurabrowser://downloads" && tabId != previousTab.id && !_showDownloadsSheet.value) {
+            stopDownloadPolling()
+        }
         if (_tabs.value.any { it.id == tabId }) {
             _activeTabId.value = tabId
             _showTabSwitcher.value = false
@@ -207,6 +241,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun closeTab(tabId: String) {
+        val closingTab = _tabs.value.find { it.id == tabId }
+        if (closingTab?.url == "aurabrowser://downloads" && !_showDownloadsSheet.value) {
+            stopDownloadPolling()
+        }
         // Free up WebView memory from pool
         webViewPoolManager.releaseWebView(tabId)
 
@@ -257,6 +295,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
+    }
+
+    fun toggleBookmarkCurrentTab() {
+        toggleBookmark()
     }
 
     fun deleteBookmark(bookmark: BookmarkEntity) {
@@ -336,6 +378,38 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         preferences.themeMode = mode
     }
 
+    fun updateAccentColor(accent: String) {
+        preferences.accentColor = accent
+    }
+
+    fun updateShowShortcuts(show: Boolean) {
+        preferences.showShortcuts = show
+    }
+
+    fun updateShowRecentHistory(show: Boolean) {
+        preferences.showRecentHistory = show
+    }
+
+    fun updateTabSwitcherLayout(layout: String) {
+        preferences.tabSwitcherLayout = layout
+    }
+
+    fun updateBottomBarItems(items: List<String>) {
+        preferences.bottomBarItems = items
+    }
+
+    fun updateWallpaperUri(uri: String?) {
+        preferences.wallpaperUri = uri
+    }
+
+    fun updateWallpaperBlur(enabled: Boolean) {
+        preferences.isWallpaperBlurEnabled = enabled
+    }
+
+    fun updateHomeIconUri(uri: String?) {
+        preferences.homeIconUri = uri
+    }
+
     // Sheet visibility setters
     fun setTabSwitcherVisible(visible: Boolean) {
         _showTabSwitcher.value = visible
@@ -356,22 +430,51 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     fun setDownloadsSheetVisible(visible: Boolean) {
         _showDownloadsSheet.value = visible
         if (visible) {
-            refreshDownloads()
+            startDownloadPolling()
+        } else {
+            stopDownloadPolling()
         }
     }
 
-    fun refreshDownloads() {
-        _downloads.value = downloadTracker.getDownloads()
+    private fun startDownloadPolling() {
+        downloadPollingJob?.cancel()
+        downloadPollingJob = viewModelScope.launch {
+            while (true) {
+                refreshDownloads()
+                // Hanya poll jika masih ada download yang berstatus PENDING/RUNNING —
+                // hemat resource, berhenti otomatis begitu semua download selesai/gagal
+                val hasActiveDownload = _downloads.value.any {
+                    it.status == DownloadStatus.PENDING || it.status == DownloadStatus.RUNNING
+                }
+                if (!hasActiveDownload) break
+                delay(1000L)
+            }
+        }
+    }
+
+    private fun stopDownloadPolling() {
+        downloadPollingJob?.cancel()
+        downloadPollingJob = null
+    }
+
+    suspend fun refreshDownloads() {
+        val result = withContext(Dispatchers.IO) {
+            downloadTracker.getDownloads()
+        }
+        _downloads.value = result
     }
 
     fun removeDownload(id: Long) {
         downloadTracker.removeDownload(id)
-        refreshDownloads()
+        viewModelScope.launch {
+            refreshDownloads()
+        }
     }
 
     fun openDownloadsTab() {
         createNewTab(url = "aurabrowser://downloads", isIncognito = false)
         setDownloadsSheetVisible(false)
+        startDownloadPolling()
     }
 
     fun setAddShortcutDialogVisible(visible: Boolean) {

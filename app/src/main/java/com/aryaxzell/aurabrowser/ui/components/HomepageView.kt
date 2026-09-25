@@ -1,5 +1,11 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +68,11 @@ fun HomepageView(
     shortcuts: List<ShortcutItem>,
     recentHistory: List<HistoryEntity>,
     bookmarks: List<BookmarkEntity>,
+    showShortcuts: Boolean = true,
+    showRecentHistory: Boolean = true,
+    wallpaperUri: String? = null,
+    isWallpaperBlurEnabled: Boolean = false,
+    homeIconUri: String? = null,
     onSearchClick: () -> Unit = {},
     onShortcutClick: (String) -> Unit,
     onAddShortcutClick: () -> Unit,
@@ -70,16 +83,80 @@ fun HomepageView(
     onOpenHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val greeting = rememberGreeting()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    val customIconBitmap = remember(homeIconUri) {
+        homeIconUri?.let { path ->
+            try {
+                BitmapFactory.decodeFile(path)?.asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    // Load and cache background wallpaper
+    val wallpaperBitmap = remember(wallpaperUri, isWallpaperBlurEnabled) {
+        if (wallpaperUri.isNullOrBlank()) null
+        else {
+            try {
+                val uri = Uri.parse(wallpaperUri)
+                var bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                        val targetWidth = 1080.coerceAtMost(info.size.width)
+                        val targetHeight = (targetWidth.toFloat() * info.size.height / info.size.width).toInt()
+                        decoder.setTargetSize(targetWidth, targetHeight)
+                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    }
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        BitmapFactory.decodeStream(stream, null, options)
+                    }
+                }
+
+                if (bitmap != null && isWallpaperBlurEnabled) {
+                    bitmap = applyStaticBlur(bitmap, context)
+                }
+                bitmap?.asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // Wallpaper Layer or Default Background
+        if (wallpaperBitmap != null) {
+            Image(
+                bitmap = wallpaperBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Scrim to keep text and controls readable
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.45f))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Spacer(modifier = Modifier.height(24.dp))
 
         // Minimalist Aura Logo
@@ -90,12 +167,21 @@ fun HomepageView(
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Language,
-                contentDescription = "Aura Browser",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp)
-            )
+            if (customIconBitmap != null) {
+                Image(
+                    bitmap = customIconBitmap,
+                    contentDescription = "Home Icon",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = "Aura Browser",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -200,86 +286,88 @@ fun HomepageView(
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
-
         // Shortcuts Section
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Shortcuts",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
+        if (showShortcuts) {
+            Spacer(modifier = Modifier.height(28.dp))
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Shortcuts Grid/Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            shortcuts.take(4).forEach { item ->
-                ShortcutBubble(
-                    title = item.title,
-                    iconLetter = item.iconLetter,
-                    faviconBase64 = item.faviconBase64,
-                    onClick = { onShortcutClick(item.url) }
-                )
-            }
-
-            // Add Shortcut button
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onAddShortcutClick() }
-                    .padding(4.dp)
-                    .testTag("add_shortcut_button")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add shortcut",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = "Add",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1
-                )
-            }
-        }
-
-        // Additional shortcuts if user has more than 4
-        if (shortcuts.size > 4) {
-            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                shortcuts.drop(4).take(4).forEach { item ->
+                Text(
+                    text = "Shortcuts",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Shortcuts Grid/Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                shortcuts.take(4).forEach { item ->
                     ShortcutBubble(
                         title = item.title,
                         iconLetter = item.iconLetter,
                         faviconBase64 = item.faviconBase64,
                         onClick = { onShortcutClick(item.url) }
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
+                }
+
+                // Add Shortcut button
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onAddShortcutClick() }
+                        .padding(4.dp)
+                        .testTag("add_shortcut_button")
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add shortcut",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Add",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Additional shortcuts if user has more than 4
+            if (shortcuts.size > 4) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    shortcuts.drop(4).take(4).forEach { item ->
+                        ShortcutBubble(
+                            title = item.title,
+                            iconLetter = item.iconLetter,
+                            faviconBase64 = item.faviconBase64,
+                            onClick = { onShortcutClick(item.url) }
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
                 }
             }
         }
@@ -348,7 +436,7 @@ fun HomepageView(
             Spacer(modifier = Modifier.height(28.dp))
         }
 
-        if (recentHistory.isNotEmpty()) {
+        if (showRecentHistory && recentHistory.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -430,6 +518,7 @@ fun HomepageView(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+        }
     }
 }
 
@@ -497,6 +586,32 @@ private fun ShortcutBubble(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+private fun applyStaticBlur(bitmap: Bitmap, context: Context): Bitmap {
+    val scaledWidth = (bitmap.width / 4).coerceAtLeast(1)
+    val scaledHeight = (bitmap.height / 4).coerceAtLeast(1)
+    val scaled = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
+    val output = scaled.copy(Bitmap.Config.ARGB_8888, true)
+    return try {
+        @Suppress("DEPRECATION")
+        val renderScriptBlur = android.renderscript.RenderScript.create(context)
+        @Suppress("DEPRECATION")
+        val input = android.renderscript.Allocation.createFromBitmap(renderScriptBlur, output)
+        @Suppress("DEPRECATION")
+        val outputAlloc = android.renderscript.Allocation.createFromBitmap(renderScriptBlur, output)
+        @Suppress("DEPRECATION")
+        val script = android.renderscript.ScriptIntrinsicBlur.create(renderScriptBlur, android.renderscript.Element.U8_4(renderScriptBlur))
+        script.setRadius(16f)
+        script.setInput(input)
+        script.forEach(outputAlloc)
+        outputAlloc.copyTo(output)
+        @Suppress("DEPRECATION")
+        renderScriptBlur.destroy()
+        Bitmap.createScaledBitmap(output, bitmap.width, bitmap.height, true)
+    } catch (e: Exception) {
+        bitmap
     }
 }
 

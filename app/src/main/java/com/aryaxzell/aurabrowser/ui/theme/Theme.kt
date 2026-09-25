@@ -14,33 +14,50 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AuraCyanDark,
-    secondary = AuraSecondaryDark,
-    background = AuraBgDark,
-    surface = AuraSurfaceDark,
-    surfaceVariant = AuraSurfaceVariantDark,
-    onPrimary = AuraBgDark,
-    onSecondary = AuraBgDark,
-    onBackground = AuraTextPrimaryDark,
-    onSurface = AuraTextPrimaryDark,
-    onSurfaceVariant = AuraTextSecondaryDark,
-    outline = AuraBorderDark
-)
+fun getAuraColorScheme(darkTheme: Boolean, accentKey: String): ColorScheme {
+    val (primaryColor, secondaryColor) = when (accentKey) {
+        "green" -> if (darkTheme) Pair(AccentEmeraldGreenDark, Color(0xFF059669)) else Pair(AccentEmeraldGreen, Color(0xFF10B981))
+        "purple" -> if (darkTheme) Pair(AccentSunsetVioletDark, Color(0xFF7C3AED)) else Pair(AccentSunsetViolet, Color(0xFF8B5CF6))
+        "rose" -> if (darkTheme) Pair(AccentRubyRoseDark, Color(0xFFE11D48)) else Pair(AccentRubyRose, Color(0xFFF43F5E))
+        "gold" -> if (darkTheme) Pair(AccentAmberGoldDark, Color(0xFFD97706)) else Pair(AccentAmberGold, Color(0xFFF59E0B))
+        "cyan" -> if (darkTheme) Pair(AccentElectricCyanDark, Color(0xFF0891B2)) else Pair(AccentElectricCyan, Color(0xFF06B6D4))
+        else -> if (darkTheme) Pair(AuraCyanDark, AuraSecondaryDark) else Pair(AuraCyanLight, AuraSecondaryLight)
+    }
 
-private val LightColorScheme = lightColorScheme(
-    primary = AuraCyanLight,
-    secondary = AuraSecondaryLight,
-    background = AuraBgLight,
-    surface = AuraSurfaceLight,
-    surfaceVariant = AuraSurfaceVariantLight,
-    onPrimary = AuraSurfaceLight,
-    onSecondary = AuraSurfaceLight,
-    onBackground = AuraTextPrimaryLight,
-    onSurface = AuraTextPrimaryLight,
-    onSurfaceVariant = AuraTextSecondaryLight,
-    outline = AuraBorderLight
-)
+    return if (darkTheme) {
+        darkColorScheme(
+            primary = primaryColor,
+            secondary = secondaryColor,
+            background = AuraBgDark,
+            surface = AuraSurfaceDark,
+            surfaceVariant = AuraSurfaceVariantDark,
+            primaryContainer = primaryColor.copy(alpha = 0.2f),
+            onPrimaryContainer = primaryColor,
+            onPrimary = AuraBgDark,
+            onSecondary = AuraBgDark,
+            onBackground = AuraTextPrimaryDark,
+            onSurface = AuraTextPrimaryDark,
+            onSurfaceVariant = AuraTextSecondaryDark,
+            outline = AuraBorderDark
+        )
+    } else {
+        lightColorScheme(
+            primary = primaryColor,
+            secondary = secondaryColor,
+            background = AuraBgLight,
+            surface = AuraSurfaceLight,
+            surfaceVariant = AuraSurfaceVariantLight,
+            primaryContainer = primaryColor.copy(alpha = 0.12f),
+            onPrimaryContainer = primaryColor,
+            onPrimary = AuraSurfaceLight,
+            onSecondary = AuraSurfaceLight,
+            onBackground = AuraTextPrimaryLight,
+            onSurface = AuraTextPrimaryLight,
+            onSurfaceVariant = AuraTextSecondaryLight,
+            outline = AuraBorderLight
+        )
+    }
+}
 
 @Composable
 private fun animatedColorScheme(target: ColorScheme): ColorScheme {
@@ -71,6 +88,7 @@ private fun animatedColorScheme(target: ColorScheme): ColorScheme {
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    accentColor: String = "blue",
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -79,8 +97,7 @@ fun MyApplicationTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> getAuraColorScheme(darkTheme = darkTheme, accentKey = accentColor)
     }
 
     val animatedScheme = animatedColorScheme(targetScheme)

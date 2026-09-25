@@ -21,8 +21,92 @@ class BrowserPreferences(context: Context) {
         private const val KEY_JAVASCRIPT_ENABLED = "pref_javascript_enabled"
         private const val KEY_DO_NOT_TRACK = "pref_do_not_track"
         private const val KEY_THEME_MODE = "pref_theme_mode" // "system", "dark", "light"
+        private const val KEY_ACCENT_COLOR = "pref_accent_color" // "blue", "green", "purple", "rose", "gold", "cyan"
+        private const val KEY_SHOW_SHORTCUTS = "pref_show_shortcuts"
+        private const val KEY_SHOW_RECENT_HISTORY = "pref_show_recent_history"
+        private const val KEY_TAB_SWITCHER_LAYOUT = "pref_tab_switcher_layout" // "grid" or "list"
+        private const val KEY_BOTTOM_BAR_ITEMS = "pref_bottom_bar_items"
+        private const val DEFAULT_BOTTOM_BAR_ITEMS = "back,forward,home,tabs,downloads"
+        private const val KEY_WALLPAPER_URI = "pref_wallpaper_uri"
+        private const val KEY_WALLPAPER_BLUR_ENABLED = "pref_wallpaper_blur_enabled"
+        private const val KEY_HOME_ICON_URI = "pref_home_icon_uri"
         private const val KEY_SHORTCUTS = "pref_shortcuts"
     }
+
+    private val _homeIconUri = MutableStateFlow(prefs.getString(KEY_HOME_ICON_URI, null))
+    val homeIconUriFlow: StateFlow<String?> = _homeIconUri.asStateFlow()
+    var homeIconUri: String?
+        get() = _homeIconUri.value
+        set(value) {
+            prefs.edit().putString(KEY_HOME_ICON_URI, value).apply()
+            _homeIconUri.value = value
+        }
+
+    private val _tabSwitcherLayout = MutableStateFlow(prefs.getString(KEY_TAB_SWITCHER_LAYOUT, "grid") ?: "grid")
+    val tabSwitcherLayoutFlow: StateFlow<String> = _tabSwitcherLayout.asStateFlow()
+    var tabSwitcherLayout: String
+        get() = _tabSwitcherLayout.value
+        set(value) {
+            prefs.edit().putString(KEY_TAB_SWITCHER_LAYOUT, value).apply()
+            _tabSwitcherLayout.value = value
+        }
+
+    private val _bottomBarItems = MutableStateFlow(
+        (prefs.getString(KEY_BOTTOM_BAR_ITEMS, DEFAULT_BOTTOM_BAR_ITEMS) ?: DEFAULT_BOTTOM_BAR_ITEMS)
+            .split(",").filter { it.isNotBlank() }
+    )
+    val bottomBarItemsFlow: StateFlow<List<String>> = _bottomBarItems.asStateFlow()
+    var bottomBarItems: List<String>
+        get() = _bottomBarItems.value
+        set(value) {
+            prefs.edit().putString(KEY_BOTTOM_BAR_ITEMS, value.joinToString(",")).apply()
+            _bottomBarItems.value = value
+        }
+
+    private val _wallpaperUri = MutableStateFlow(prefs.getString(KEY_WALLPAPER_URI, null))
+    val wallpaperUriFlow: StateFlow<String?> = _wallpaperUri.asStateFlow()
+    var wallpaperUri: String?
+        get() = _wallpaperUri.value
+        set(value) {
+            prefs.edit().putString(KEY_WALLPAPER_URI, value).apply()
+            _wallpaperUri.value = value
+        }
+
+    private val _isWallpaperBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_WALLPAPER_BLUR_ENABLED, false))
+    val isWallpaperBlurEnabledFlow: StateFlow<Boolean> = _isWallpaperBlurEnabled.asStateFlow()
+    var isWallpaperBlurEnabled: Boolean
+        get() = _isWallpaperBlurEnabled.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_WALLPAPER_BLUR_ENABLED, value).apply()
+            _isWallpaperBlurEnabled.value = value
+        }
+
+    private val _accentColor = MutableStateFlow(prefs.getString(KEY_ACCENT_COLOR, "blue") ?: "blue")
+    val accentColorFlow: StateFlow<String> = _accentColor.asStateFlow()
+    var accentColor: String
+        get() = _accentColor.value
+        set(value) {
+            prefs.edit().putString(KEY_ACCENT_COLOR, value).apply()
+            _accentColor.value = value
+        }
+
+    private val _showShortcuts = MutableStateFlow(prefs.getBoolean(KEY_SHOW_SHORTCUTS, true))
+    val showShortcutsFlow: StateFlow<Boolean> = _showShortcuts.asStateFlow()
+    var showShortcuts: Boolean
+        get() = _showShortcuts.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_SHOW_SHORTCUTS, value).apply()
+            _showShortcuts.value = value
+        }
+
+    private val _showRecentHistory = MutableStateFlow(prefs.getBoolean(KEY_SHOW_RECENT_HISTORY, true))
+    val showRecentHistoryFlow: StateFlow<Boolean> = _showRecentHistory.asStateFlow()
+    var showRecentHistory: Boolean
+        get() = _showRecentHistory.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_SHOW_RECENT_HISTORY, value).apply()
+            _showRecentHistory.value = value
+        }
 
     private val _searchEngine = MutableStateFlow(loadSearchEngine())
     val searchEngineFlow: StateFlow<SearchEngine> = _searchEngine.asStateFlow()

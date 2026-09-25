@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.URLUtil
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -99,6 +101,7 @@ fun BrowserWebView(
     onProgressChanged: (tabId: String, progress: Int) -> Unit,
     onReceivedError: (tabId: String, description: String, isOffline: Boolean) -> Unit,
     onFaviconReceived: (tabId: String, faviconBase64: String) -> Unit,
+    onShowFileChooser: (Intent, ValueCallback<Array<Uri>>) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -106,6 +109,7 @@ fun BrowserWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var defaultUserAgent by remember { mutableStateOf("") }
     val currentAdBlockState by rememberUpdatedState(isAdBlockEnabled)
+    var isFirstAdBlockComposition by remember(activeTab.id) { mutableStateOf(true) }
 
     // Pull to Refresh state tied to active tab loading
     val isRefreshing = activeTab.isLoading
@@ -120,14 +124,28 @@ fun BrowserWebView(
         }
     }
 
+    fun applyUserAgentForCurrentMode() {
+        webViewInstance?.settings?.let { settings ->
+            if (activeTab.isDesktopMode) {
+                settings.userAgentString = DESKTOP_USER_AGENT
+            } else if (defaultUserAgent.isNotBlank()) {
+                settings.userAgentString = defaultUserAgent
+            }
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+        }
+    }
+
     // Handle ViewModel actions (Reload, Stop, GoBack, GoForward, LoadUrl)
     LaunchedEffect(webAction) {
         val action = webAction ?: return@LaunchedEffect
         when (action) {
             is BrowserViewModel.WebAction.LoadUrl -> {
+                applyUserAgentForCurrentMode()
                 webViewInstance?.loadUrl(action.url)
             }
             is BrowserViewModel.WebAction.Reload -> {
+                applyUserAgentForCurrentMode()
                 webViewInstance?.reload()
             }
             is BrowserViewModel.WebAction.Stop -> {
@@ -147,8 +165,12 @@ fun BrowserWebView(
         onActionConsumed()
     }
 
-    // Reactively reload when AdBlock toggle changes on an active non-home tab
+    // Reactively reload when AdBlock toggle changes on an active non-home tab (skip first composition on tab entry)
     LaunchedEffect(isAdBlockEnabled) {
+        if (isFirstAdBlockComposition) {
+            isFirstAdBlockComposition = false
+            return@LaunchedEffect
+        }
         if (!activeTab.isHome && webViewInstance != null) {
             webViewInstance?.reload()
         }
@@ -159,18 +181,10 @@ fun BrowserWebView(
         webViewInstance?.settings?.javaScriptEnabled = isJavaScriptEnabled
     }
 
-    // Update User Agent based on desktop mode
-    LaunchedEffect(activeTab.isDesktopMode, defaultUserAgent) {
-        webViewInstance?.settings?.let { settings ->
-            if (activeTab.isDesktopMode) {
-                settings.userAgentString = DESKTOP_USER_AGENT
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
-            } else if (defaultUserAgent.isNotBlank()) {
-                settings.userAgentString = defaultUserAgent
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
-            }
+    // Apply User Agent when tab entry or defaultUserAgent is captured
+    LaunchedEffect(activeTab.id, defaultUserAgent) {
+        if (defaultUserAgent.isNotBlank()) {
+            applyUserAgentForCurrentMode()
         }
     }
 
@@ -195,6 +209,10 @@ fun BrowserWebView(
                         )
 
                         defaultUserAgent = newView.settings.userAgentString
+
+                        // Viewport & Safe Area CSS support (env(safe-area-inset-*))
+                        newView.settings.useWideViewPort = true
+                        newView.settings.loadWithOverviewMode = true
 
                         // Security & Performance WebView settings
                         newView.settings.javaScriptEnabled = isJavaScriptEnabled
@@ -259,6 +277,24 @@ fun BrowserWebView(
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                     }
+                                }
+                            }
+
+                            override fun onShowFileChooser(
+                                webView: WebView?,
+                                filePathCallback: ValueCallback<Array<Uri>>?,
+                                fileChooserParams: FileChooserParams?
+                            ): Boolean {
+                                if (filePathCallback == null) return false
+                                val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                                    type = "*/*"
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                }
+                                return try {
+                                    onShowFileChooser(intent, filePathCallback)
+                                    true
+                                } catch (e: Exception) {
+                                    false
                                 }
                             }
                         }
@@ -361,6 +397,7 @@ fun BrowserWebView(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
+                    .safeDrawingPadding()
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {

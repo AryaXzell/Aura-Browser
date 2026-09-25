@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -53,6 +54,7 @@ import com.aryaxzell.aurabrowser.data.model.TabItem
 fun TabSwitcherView(
     tabs: List<TabItem>,
     activeTabId: String,
+    layoutMode: String = "grid",
     onSelectTab: (String) -> Unit,
     onCloseTab: (String) -> Unit,
     onNewTab: (Boolean) -> Unit,
@@ -132,122 +134,241 @@ fun TabSwitcherView(
                 }
             }
 
-            // Tabs Grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(380.dp)
-            ) {
-                items(tabs, key = { it.id }) { tab ->
-                    val isActive = tab.id == activeTabId
+            if (layoutMode == "list") {
+                // List Layout
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(380.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(tabs, key = { it.id }) { tab ->
+                        val isActive = tab.id == activeTabId
+                        TabListRow(
+                            tab = tab,
+                            isActive = isActive,
+                            onClick = { onSelectTab(tab.id) },
+                            onClose = { onCloseTab(tab.id) }
+                        )
+                    }
+                }
+            } else {
+                // Grid Layout
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(380.dp)
+                ) {
+                    items(tabs, key = { it.id }) { tab ->
+                        val isActive = tab.id == activeTabId
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onSelectTab(tab.id) }
-                            .then(
-                                if (isActive) {
-                                    Modifier.border(
-                                        width = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .testTag("tab_card_${tab.id}"),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (tab.isIncognito) {
-                                MaterialTheme.colorScheme.inverseSurface
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
+                        Card(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = when {
-                                        tab.isIncognito -> Icons.Default.Shield
-                                        tab.url == "aurabrowser://downloads" -> Icons.Default.Download
-                                        else -> Icons.Default.Language
-                                    },
-                                    contentDescription = null,
-                                    tint = if (tab.isIncognito) {
-                                        MaterialTheme.colorScheme.inverseOnSurface
+                                .fillMaxWidth()
+                                .height(130.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { onSelectTab(tab.id) }
+                                .then(
+                                    if (isActive) {
+                                        Modifier.border(
+                                            width = 2.dp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = RoundedCornerShape(16.dp)
+                                        )
                                     } else {
-                                        MaterialTheme.colorScheme.primary
-                                    },
-                                    modifier = Modifier.size(18.dp)
+                                        Modifier
+                                    }
                                 )
-
-                                IconButton(
-                                    onClick = { onCloseTab(tab.id) },
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .testTag("close_tab_${tab.id}")
+                                .testTag("tab_card_${tab.id}"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (tab.isIncognito) {
+                                    MaterialTheme.colorScheme.inverseSurface
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close tab",
+                                        imageVector = when {
+                                            tab.isIncognito -> Icons.Default.Shield
+                                            tab.url == "aurabrowser://downloads" -> Icons.Default.Download
+                                            else -> Icons.Default.Language
+                                        },
+                                        contentDescription = null,
                                         tint = if (tab.isIncognito) {
                                             MaterialTheme.colorScheme.inverseOnSurface
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                            MaterialTheme.colorScheme.primary
                                         },
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(18.dp)
+                                    )
+
+                                    IconButton(
+                                        onClick = { onCloseTab(tab.id) },
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .testTag("close_tab_${tab.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close tab",
+                                            tint = if (tab.isIncognito) {
+                                                MaterialTheme.colorScheme.inverseOnSurface
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                Column {
+                                    Text(
+                                        text = if (tab.isHome) "Home" else tab.title.ifBlank { "Untitled" },
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (tab.isIncognito) {
+                                            MaterialTheme.colorScheme.inverseOnSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                    Text(
+                                        text = if (tab.isHome) "aura://home" else tab.url.removePrefix("https://").removePrefix("http://"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (tab.isIncognito) {
+                                            MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
                                     )
                                 }
-                            }
-
-                            Column {
-                                Text(
-                                    text = if (tab.isHome) "Home" else tab.title.ifBlank { "Untitled" },
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = if (tab.isIncognito) {
-                                        MaterialTheme.colorScheme.inverseOnSurface
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    }
-                                )
-
-                                Spacer(modifier = Modifier.height(2.dp))
-
-                                Text(
-                                    text = if (tab.isHome) "aura://home" else tab.url.removePrefix("https://").removePrefix("http://"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = if (tab.isIncognito) {
-                                        MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TabListRow(
+    tab: TabItem,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    onClose: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (tab.isIncognito) MaterialTheme.colorScheme.inverseSurface
+                else if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .then(
+                if (isActive) {
+                    Modifier.border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clickable(onClick = onClick)
+            .padding(12.dp)
+            .testTag("tab_list_row_${tab.id}"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    if (tab.isIncognito) MaterialTheme.colorScheme.surface.copy(alpha = 0.2f)
+                    else MaterialTheme.colorScheme.surface
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = when {
+                    tab.isIncognito -> Icons.Default.Shield
+                    tab.url == "aurabrowser://downloads" -> Icons.Default.Download
+                    else -> Icons.Default.Language
+                },
+                contentDescription = null,
+                tint = if (tab.isIncognito) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (tab.isHome) "Home" else tab.title.ifBlank { "Untitled" },
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = if (tab.isIncognito) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = if (tab.isHome) "aura://home" else tab.url.removePrefix("https://").removePrefix("http://"),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (tab.isIncognito) {
+                    MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .size(32.dp)
+                .testTag("close_tab_${tab.id}")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Close tab",
+                tint = if (tab.isIncognito) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

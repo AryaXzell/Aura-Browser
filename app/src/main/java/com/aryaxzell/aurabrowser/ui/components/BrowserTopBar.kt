@@ -143,7 +143,7 @@ fun BrowserTopBar(
                     .clickable(enabled = !isEditingUrl) {
                         onStartEditingUrl()
                     },
-                color = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
                 shape = CircleShape,
                 tonalElevation = 4.dp,
                 shadowElevation = 6.dp,
@@ -299,7 +299,7 @@ fun BrowserTopBar(
                         .size(48.dp)
                         .clip(CircleShape),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
                     tonalElevation = 4.dp,
                     shadowElevation = 6.dp,
                     border = BorderStroke(
@@ -377,7 +377,7 @@ private fun TopBarMenu(
                 .size(48.dp)
                 .clip(CircleShape),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
             tonalElevation = 4.dp,
             shadowElevation = 6.dp,
             border = BorderStroke(

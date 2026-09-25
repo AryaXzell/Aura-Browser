@@ -1,11 +1,15 @@
 package com.aryaxzell.aurabrowser
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.webkit.ValueCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -18,14 +22,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aryaxzell.aurabrowser.ui.components.AddShortcutDialog
 import com.aryaxzell.aurabrowser.ui.components.BookmarksView
@@ -40,28 +46,80 @@ import com.aryaxzell.aurabrowser.ui.components.SettingsView
 import com.aryaxzell.aurabrowser.ui.components.TabSwitcherView
 import com.aryaxzell.aurabrowser.ui.theme.MyApplicationTheme
 import com.aryaxzell.aurabrowser.viewmodel.BrowserViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val viewModel: BrowserViewModel by viewModels()
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* no-op: baik diterima maupun ditolak, download tetap jalan */ }
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        val resultUris: Array<Uri>? = when {
+            result.resultCode != RESULT_OK -> null
+            data?.clipData != null -> {
+                val clipData = data.clipData!!
+                Array(clipData.itemCount) { i -> clipData.getItemAt(i).uri }
+            }
+            data?.data != null -> arrayOf(data.data!!)
+            else -> null
+        }
+        fileChooserCallback?.onReceiveValue(resultUris)
+        fileChooserCallback = null
+    }
+
+    fun launchFileChooser(intent: Intent, callback: ValueCallback<Array<Uri>>) {
+        fileChooserCallback?.onReceiveValue(null)
+        fileChooserCallback = callback
+        try {
+            fileChooserLauncher.launch(intent)
+        } catch (e: Exception) {
+            fileChooserCallback = null
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         // Handle external VIEW intent (e.g. clicked link from another app)
         handleIntent(intent)
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
             val isDarkTheme = when (themeMode) {
                 "dark" -> true
                 "light" -> false
                 else -> isSystemInDarkTheme()
             }
 
-            MyApplicationTheme(darkTheme = isDarkTheme) {
-                BrowserApp(viewModel = viewModel)
+            // Sinkronkan warna ikon status bar & navigation bar dengan tema aktif
+            LaunchedEffect(isDarkTheme) {
+                val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+                insetsController.isAppearanceLightStatusBars = !isDarkTheme
+                insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+            }
+
+            MyApplicationTheme(
+                darkTheme = isDarkTheme,
+                accentColor = accentColor
+            ) {
+                BrowserApp(
+                    viewModel = viewModel,
+                    onShowFileChooser = { intent, callback -> launchFileChooser(intent, callback) }
+                )
             }
         }
     }
@@ -80,8 +138,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BrowserApp(viewModel: BrowserViewModel) {
+fun BrowserApp(
+    viewModel: BrowserViewModel,
+    onShowFileChooser: (Intent, ValueCallback<Array<Uri>>) -> Unit
+) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val activeTabId by viewModel.activeTabId.collectAsStateWithLifecycle()
     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
@@ -89,6 +151,14 @@ fun BrowserApp(viewModel: BrowserViewModel) {
     // Reactive preferences
     val searchEngine by viewModel.searchEngine.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+    val showShortcuts by viewModel.showShortcuts.collectAsStateWithLifecycle()
+    val showRecentHistory by viewModel.showRecentHistory.collectAsStateWithLifecycle()
+    val tabSwitcherLayout by viewModel.tabSwitcherLayout.collectAsStateWithLifecycle()
+    val bottomBarItems by viewModel.bottomBarItems.collectAsStateWithLifecycle()
+    val wallpaperUri by viewModel.wallpaperUri.collectAsStateWithLifecycle()
+    val isWallpaperBlurEnabled by viewModel.isWallpaperBlurEnabled.collectAsStateWithLifecycle()
+    val homeIconUri by viewModel.homeIconUri.collectAsStateWithLifecycle()
     val isAdBlockEnabled by viewModel.isAdBlockEnabled.collectAsStateWithLifecycle()
     val isDesktopModeDefault by viewModel.isDesktopModeDefault.collectAsStateWithLifecycle()
     val isJavaScriptEnabled by viewModel.isJavaScriptEnabled.collectAsStateWithLifecycle()
@@ -107,10 +177,9 @@ fun BrowserApp(viewModel: BrowserViewModel) {
     val showDownloadsSheet by viewModel.showDownloadsSheet.collectAsStateWithLifecycle()
     val showSettingsSheet by viewModel.showSettingsSheet.collectAsStateWithLifecycle()
     val showAddShortcutDialog by viewModel.showAddShortcutDialog.collectAsStateWithLifecycle()
-    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
     val webAction by viewModel.webAction.collectAsStateWithLifecycle()
-    val isBookmarked = bookmarks.any { it.url == activeTab.url && activeTab.url.isNotBlank() }
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -120,14 +189,14 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 activeTab = activeTab,
                 isEditingUrl = isEditingUrl,
                 urlInput = urlInput,
-                onUrlInputChange = { viewModel.setUrlInput(it) },
+                onUrlInputChange = { viewModel.updateUrlInput(it) },
                 onStartEditingUrl = { viewModel.setIsEditingUrl(true) },
-                onSubmitUrl = { viewModel.submitQueryOrUrl(it) },
-                onCancelEditingUrl = { viewModel.setIsEditingUrl(false) },
+                onSubmitUrl = { viewModel.loadUrl(it) },
+                onCancelEditingUrl = { viewModel.cancelEditingUrl() },
                 onReload = { viewModel.reload() },
-                onStop = { viewModel.stopLoading() },
-                onToggleBookmark = { viewModel.toggleBookmark() },
-                isBookmarked = isBookmarked,
+                onStop = { viewModel.stop() },
+                onToggleBookmark = { viewModel.toggleBookmarkCurrentTab() },
+                isBookmarked = bookmarks.any { it.url == activeTab.url && activeTab.url.isNotBlank() },
                 onToggleDesktop = { viewModel.toggleDesktopMode() },
                 onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
                 onOpenHistory = { viewModel.setHistorySheetVisible(true) },
@@ -136,19 +205,19 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 onOpenNewTab = { isIncognito -> viewModel.createNewTab(isIncognito = isIncognito) },
                 onShareUrl = {
                     if (activeTab.url.isNotBlank()) {
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, activeTab.url)
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, activeTab.url)
+                            putExtra(Intent.EXTRA_SUBJECT, activeTab.title)
                         }
-                        val shareIntent = Intent.createChooser(sendIntent, "Share link via")
-                        context.startActivity(shareIntent)
+                        context.startActivity(Intent.createChooser(shareIntent, "Share URL"))
                     }
                 }
             )
         },
         bottomBar = {
             BrowserBottomBar(
+                enabledItems = bottomBarItems,
                 canGoBack = activeTab.canGoBack,
                 canGoForward = activeTab.canGoForward,
                 tabCount = tabs.size,
@@ -158,6 +227,8 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 onNewTab = { viewModel.createNewTab() },
                 onOpenDownloads = { viewModel.setDownloadsSheetVisible(true) },
                 onOpenTabSwitcher = { viewModel.setTabSwitcherVisible(true) },
+                onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
+                onOpenHistory = { viewModel.setHistorySheetVisible(true) },
                 onGoHome = { viewModel.goHome() }
             )
         }
@@ -183,6 +254,11 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                         shortcuts = shortcuts,
                         recentHistory = history,
                         bookmarks = bookmarks,
+                        showShortcuts = showShortcuts,
+                        showRecentHistory = showRecentHistory,
+                        wallpaperUri = wallpaperUri,
+                        isWallpaperBlurEnabled = isWallpaperBlurEnabled,
+                        homeIconUri = homeIconUri,
                         onSearchClick = { viewModel.setIsEditingUrl(true) },
                         onShortcutClick = { url -> viewModel.loadUrl(url) },
                         onAddShortcutClick = { viewModel.setAddShortcutDialogVisible(true) },
@@ -195,7 +271,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 } else if (tabToRender.url == "aurabrowser://downloads") {
                     DownloadsTabContent(
                         downloads = downloads,
-                        onRefresh = { viewModel.refreshDownloads() },
+                        onRefresh = { coroutineScope.launch { viewModel.refreshDownloads() } },
                         onDeleteDownload = { viewModel.removeDownload(it) }
                     )
                 } else {
@@ -214,6 +290,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                         onProgressChanged = { tabId, progress -> viewModel.onProgressChanged(tabId, progress) },
                         onReceivedError = { tabId, desc, isOffline -> viewModel.onReceivedError(tabId, desc, isOffline) },
                         onFaviconReceived = { tabId, favicon -> viewModel.onFaviconReceived(tabId, favicon) },
+                        onShowFileChooser = onShowFileChooser,
                         onRetry = { viewModel.goHome() }
                     )
                 }
@@ -226,6 +303,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
         TabSwitcherView(
             tabs = tabs,
             activeTabId = activeTabId,
+            layoutMode = tabSwitcherLayout,
             onSelectTab = { viewModel.selectTab(it) },
             onCloseTab = { viewModel.closeTab(it) },
             onNewTab = { isIncognito -> viewModel.createNewTab(isIncognito = isIncognito) },
@@ -264,7 +342,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
     if (showDownloadsSheet) {
         DownloadsView(
             downloads = downloads,
-            onRefresh = { viewModel.refreshDownloads() },
+            onRefresh = { coroutineScope.launch { viewModel.refreshDownloads() } },
             onDeleteDownload = { viewModel.removeDownload(it) },
             onOpenAsTab = { viewModel.openDownloadsTab() },
             onDismiss = { viewModel.setDownloadsSheetVisible(false) }
@@ -280,6 +358,22 @@ fun BrowserApp(viewModel: BrowserViewModel) {
             onUpdateUserName = { viewModel.updateUserName(it) },
             themeMode = themeMode,
             onSelectThemeMode = { viewModel.updateThemeMode(it) },
+            accentColor = accentColor,
+            onSelectAccentColor = { viewModel.updateAccentColor(it) },
+            showShortcuts = showShortcuts,
+            onToggleShowShortcuts = { viewModel.updateShowShortcuts(it) },
+            showRecentHistory = showRecentHistory,
+            onToggleShowRecentHistory = { viewModel.updateShowRecentHistory(it) },
+            tabSwitcherLayout = tabSwitcherLayout,
+            onSelectTabSwitcherLayout = { viewModel.updateTabSwitcherLayout(it) },
+            bottomBarItems = bottomBarItems,
+            onUpdateBottomBarItems = { viewModel.updateBottomBarItems(it) },
+            wallpaperUri = wallpaperUri,
+            isWallpaperBlurEnabled = isWallpaperBlurEnabled,
+            onUpdateWallpaperUri = { viewModel.updateWallpaperUri(it) },
+            onUpdateWallpaperBlur = { viewModel.updateWallpaperBlur(it) },
+            homeIconUri = homeIconUri,
+            onUpdateHomeIconUri = { viewModel.updateHomeIconUri(it) },
             isAdBlockEnabled = isAdBlockEnabled,
             onToggleAdBlock = { viewModel.updateAdBlock(it) },
             isDesktopModeDefault = isDesktopModeDefault,

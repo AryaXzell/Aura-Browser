@@ -1,11 +1,20 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,18 +36,34 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Wallpaper
+import java.io.File
+import java.io.FileOutputStream
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,11 +91,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aryaxzell.aurabrowser.BuildConfig
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +110,22 @@ fun SettingsView(
     onUpdateUserName: (String) -> Unit,
     themeMode: String,
     onSelectThemeMode: (String) -> Unit,
+    accentColor: String,
+    onSelectAccentColor: (String) -> Unit,
+    showShortcuts: Boolean,
+    onToggleShowShortcuts: (Boolean) -> Unit,
+    showRecentHistory: Boolean,
+    onToggleShowRecentHistory: (Boolean) -> Unit,
+    tabSwitcherLayout: String,
+    onSelectTabSwitcherLayout: (String) -> Unit,
+    bottomBarItems: List<String>,
+    onUpdateBottomBarItems: (List<String>) -> Unit,
+    wallpaperUri: String?,
+    isWallpaperBlurEnabled: Boolean,
+    onUpdateWallpaperUri: (String?) -> Unit,
+    onUpdateWallpaperBlur: (Boolean) -> Unit,
+    homeIconUri: String? = null,
+    onUpdateHomeIconUri: (String?) -> Unit = {},
     isAdBlockEnabled: Boolean,
     onToggleAdBlock: (Boolean) -> Unit,
     isDesktopModeDefault: Boolean,
@@ -98,7 +142,7 @@ fun SettingsView(
     var showNameEditDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
 
-    val tabs = listOf("General", "Privacy", "Browser")
+    val tabs = listOf("General", "Appearance", "Privacy", "Browser")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -183,16 +227,34 @@ fun SettingsView(
                                 userName = userName,
                                 onOpenEditName = { showNameEditDialog = true }
                             )
-                            1 -> PrivacyTabContent(
+                            1 -> AppearanceTabContent(
+                                themeMode = themeMode,
+                                onSelectThemeMode = onSelectThemeMode,
+                                accentColor = accentColor,
+                                onSelectAccentColor = onSelectAccentColor,
+                                tabSwitcherLayout = tabSwitcherLayout,
+                                onSelectTabSwitcherLayout = onSelectTabSwitcherLayout,
+                                bottomBarItems = bottomBarItems,
+                                onUpdateBottomBarItems = onUpdateBottomBarItems,
+                                wallpaperUri = wallpaperUri,
+                                isWallpaperBlurEnabled = isWallpaperBlurEnabled,
+                                onUpdateWallpaperUri = onUpdateWallpaperUri,
+                                onUpdateWallpaperBlur = onUpdateWallpaperBlur,
+                                homeIconUri = homeIconUri,
+                                onUpdateHomeIconUri = onUpdateHomeIconUri,
+                                showShortcuts = showShortcuts,
+                                onToggleShowShortcuts = onToggleShowShortcuts,
+                                showRecentHistory = showRecentHistory,
+                                onToggleShowRecentHistory = onToggleShowRecentHistory
+                            )
+                            2 -> PrivacyTabContent(
                                 isAdBlockEnabled = isAdBlockEnabled,
                                 onToggleAdBlock = onToggleAdBlock,
                                 isDoNotTrack = isDoNotTrack,
                                 onToggleDoNotTrack = onToggleDoNotTrack,
                                 onOpenClearData = { showClearDataDialog = true }
                             )
-                            2 -> BrowserTabContent(
-                                themeMode = themeMode,
-                                onSelectThemeMode = onSelectThemeMode,
+                            3 -> BrowserTabContent(
                                 isDesktopModeDefault = isDesktopModeDefault,
                                 onToggleDesktopDefault = onToggleDesktopDefault,
                                 isJavaScriptEnabled = isJavaScriptEnabled,
@@ -445,17 +507,62 @@ private fun PrivacyTabContent(
 }
 
 @Composable
-private fun BrowserTabContent(
+private fun AppearanceTabContent(
     themeMode: String,
     onSelectThemeMode: (String) -> Unit,
-    isDesktopModeDefault: Boolean,
-    onToggleDesktopDefault: (Boolean) -> Unit,
-    isJavaScriptEnabled: Boolean,
-    onToggleJavaScript: (Boolean) -> Unit
+    accentColor: String,
+    onSelectAccentColor: (String) -> Unit,
+    tabSwitcherLayout: String,
+    onSelectTabSwitcherLayout: (String) -> Unit,
+    bottomBarItems: List<String>,
+    onUpdateBottomBarItems: (List<String>) -> Unit,
+    wallpaperUri: String?,
+    isWallpaperBlurEnabled: Boolean,
+    onUpdateWallpaperUri: (String?) -> Unit,
+    onUpdateWallpaperBlur: (Boolean) -> Unit,
+    homeIconUri: String? = null,
+    onUpdateHomeIconUri: (String?) -> Unit = {},
+    showShortcuts: Boolean,
+    onToggleShowShortcuts: (Boolean) -> Unit,
+    showRecentHistory: Boolean,
+    onToggleShowRecentHistory: (Boolean) -> Unit
 ) {
-    // Card 1: Appearance
+    val context = LocalContext.current
+    var pendingCropBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val homeIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val downsampled = decodeDownsampledBitmap(context, uri, maxDimension = 1024)
+                pendingCropBitmap = downsampled
+            } catch (e: Exception) {
+                // Ignore decode failure
+            }
+        }
+    }
+
+    val wallpaperPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Some providers might not support persistable permissions
+            }
+            onUpdateWallpaperUri(uri.toString())
+        }
+    }
+
+    // Card 1: Theme Mode
     IOSCardGroup(
-        header = "APPEARANCE"
+        header = "THEME MODE",
+        footer = "Choose between dark, light, or automatically matching your system theme."
     ) {
         val themes = listOf(
             "system" to "Follow System",
@@ -488,10 +595,285 @@ private fun BrowserTabContent(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Card 2: Web Engine
+    // Card 2: Accent Color Palette
+    IOSCardGroup(
+        header = "ACCENT COLOR",
+        footer = "Customize buttons, icons, highlights, and navigation accents throughout Aura Browser."
+    ) {
+        val accentList = listOf(
+            Triple("blue", "Aura Blue", Color(0xFF0284C7)),
+            Triple("green", "Emerald Green", Color(0xFF059669)),
+            Triple("purple", "Sunset Violet", Color(0xFF7C3AED)),
+            Triple("rose", "Ruby Rose", Color(0xFFE11D48)),
+            Triple("gold", "Amber Gold", Color(0xFFD97706)),
+            Triple("cyan", "Electric Cyan", Color(0xFF0891B2))
+        )
+
+        accentList.forEachIndexed { index, (key, label, color) ->
+            val isSelected = accentColor == key
+            IOSSettingsRow(
+                icon = Icons.Default.ColorLens,
+                iconBgColor = color,
+                title = label,
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                        )
+                        if (isSelected) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    }
+                },
+                onClick = { onSelectAccentColor(key) }
+            )
+            if (index < accentList.size - 1) {
+                IOSHairlineDivider()
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card 3: Tab Switcher Layout
+    IOSCardGroup(
+        header = "TAB SWITCHER LAYOUT",
+        footer = "Choose between standard 2-column grid and vertical full-width list view for open tabs."
+    ) {
+        IOSSettingsRow(
+            icon = Icons.Default.GridView,
+            iconBgColor = Color(0xFF5856D6),
+            title = "Layout Mode",
+            subtitle = if (tabSwitcherLayout == "grid") "Grid View" else "List View",
+            trailingContent = {
+                Box(modifier = Modifier.width(150.dp)) {
+                    IOSSegmentedControl(
+                        tabs = listOf("Grid", "List"),
+                        selectedIndex = if (tabSwitcherLayout == "grid") 0 else 1,
+                        onTabSelected = { index ->
+                            onSelectTabSwitcherLayout(if (index == 0) "grid" else "list")
+                        }
+                    )
+                }
+            }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card 4: Bottom Navigation Bar Customization
+    IOSCardGroup(
+        header = "BOTTOM BAR CUSTOMIZATION",
+        footer = "Select up to 5 actions to display on the floating bottom navigation bar."
+    ) {
+        val availableItems = listOf(
+            "back" to "Back Button",
+            "forward" to "Forward Button",
+            "home" to "Home / New Tab",
+            "tabs" to "Tab Switcher",
+            "downloads" to "Downloads",
+            "bookmarks" to "Bookmarks",
+            "history" to "History"
+        )
+
+        availableItems.forEachIndexed { index, (key, label) ->
+            val isChecked = key in bottomBarItems
+            val canCheck = isChecked || bottomBarItems.size < 5
+
+            IOSSettingsRow(
+                icon = Icons.Default.Apps,
+                iconBgColor = Color(0xFF007AFF),
+                title = label,
+                subtitle = if (!isChecked && bottomBarItems.size >= 5) "Max 5 items reached" else null,
+                trailingContent = {
+                    Switch(
+                        checked = isChecked,
+                        enabled = canCheck,
+                        onCheckedChange = { checked ->
+                            val updated = if (checked) {
+                                if (bottomBarItems.size < 5) bottomBarItems + key else bottomBarItems
+                            } else {
+                                bottomBarItems - key
+                            }
+                            onUpdateBottomBarItems(updated)
+                        }
+                    )
+                }
+            )
+            if (index < availableItems.size - 1) {
+                IOSHairlineDivider()
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card 5: Homepage Background & Wallpaper
+    IOSCardGroup(
+        header = "HOMEPAGE BACKGROUND",
+        footer = "Personalize your new tab home page with a photo from your device gallery."
+    ) {
+        IOSSettingsRow(
+            icon = Icons.Default.Wallpaper,
+            iconBgColor = Color(0xFFFF2D55),
+            title = "Choose Wallpaper",
+            subtitle = if (wallpaperUri != null) "Custom wallpaper set" else "Using default background",
+            onClick = {
+                wallpaperPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Pick wallpaper",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        )
+
+        if (wallpaperUri != null) {
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.BlurOn,
+                iconBgColor = Color(0xFF5AC8FA),
+                title = "Blur Wallpaper",
+                subtitle = "Soft blur for better readability",
+                trailingContent = {
+                    Switch(
+                        checked = isWallpaperBlurEnabled,
+                        onCheckedChange = onUpdateWallpaperBlur
+                    )
+                }
+            )
+
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.Delete,
+                iconBgColor = Color(0xFFFF3B30),
+                title = "Remove Wallpaper",
+                subtitle = "Reset to default background",
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = { onUpdateWallpaperUri(null) }
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card 6: Custom Home Icon
+    IOSCardGroup(
+        header = "HOME ICON",
+        footer = "Customize the main icon displayed on your home page with a cropped 1:1 image."
+    ) {
+        IOSSettingsRow(
+            icon = Icons.Default.Image,
+            iconBgColor = Color(0xFFAF52DE),
+            title = "Custom Home Icon",
+            subtitle = if (homeIconUri != null) "Custom icon set" else "Using default Aura logo",
+            onClick = {
+                homeIconPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Pick custom icon",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        )
+
+        if (homeIconUri != null) {
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.RestartAlt,
+                iconBgColor = Color(0xFFFF3B30),
+                title = "Reset to Default Icon",
+                subtitle = "Remove custom icon",
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = { onUpdateHomeIconUri(null) }
+            )
+        }
+    }
+
+    pendingCropBitmap?.let { bitmap ->
+        ImageCropDialog(
+            sourceBitmap = bitmap,
+            onConfirm = { croppedBitmap ->
+                val savedPath = saveCroppedIconToInternalStorage(context, croppedBitmap)
+                onUpdateHomeIconUri(savedPath)
+                pendingCropBitmap = null
+            },
+            onDismiss = { pendingCropBitmap = null }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card 6: Home Screen Widgets
+    IOSCardGroup(
+        header = "HOME SCREEN WIDGETS",
+        footer = "Choose which sections to display on your new tab home page."
+    ) {
+        IOSSettingsRow(
+            icon = Icons.Default.Dashboard,
+            iconBgColor = Color(0xFF007AFF),
+            title = "Speed Dial Shortcuts",
+            subtitle = "Show favorite site quick launch icons",
+            trailingContent = {
+                Switch(
+                    checked = showShortcuts,
+                    onCheckedChange = onToggleShowShortcuts
+                )
+            }
+        )
+
+        IOSHairlineDivider()
+
+        IOSSettingsRow(
+            icon = Icons.Default.History,
+            iconBgColor = Color(0xFFFF9500),
+            title = "Recent Browsing History",
+            subtitle = "Show recent pages on home screen",
+            trailingContent = {
+                Switch(
+                    checked = showRecentHistory,
+                    onCheckedChange = onToggleShowRecentHistory
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun BrowserTabContent(
+    isDesktopModeDefault: Boolean,
+    onToggleDesktopDefault: (Boolean) -> Unit,
+    isJavaScriptEnabled: Boolean,
+    onToggleJavaScript: (Boolean) -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+
+    // Card 1: Web Engine
     IOSCardGroup(
         header = "WEB ENGINE",
-        footer = "Configure how the embedded WebView renders web pages."
+        footer = "Configure how embedded web pages are rendered."
     ) {
         IOSSettingsRow(
             icon = Icons.Default.Laptop,
@@ -524,7 +906,7 @@ private fun BrowserTabContent(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Card 3: About
+    // Card 2: About
     IOSCardGroup(
         header = "ABOUT"
     ) {
@@ -532,12 +914,36 @@ private fun BrowserTabContent(
             icon = Icons.Default.Info,
             iconBgColor = Color(0xFF8E8E93), // iOS System Gray
             title = "Aura Browser",
-            subtitle = "Version 1.0 • Android System WebView",
+            subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             trailingContent = {
                 Text(
-                    text = "v1.0",
+                    text = "v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+
+        IOSHairlineDivider()
+
+        IOSSettingsRow(
+            icon = Icons.Default.Person,
+            iconBgColor = Color(0xFF34C759), // iOS System Green
+            title = "Created by aryaxzell",
+            subtitle = "github.com/aryaxzell",
+            onClick = {
+                try {
+                    uriHandler.openUri("https://github.com/aryaxzell")
+                } catch (e: Exception) {
+                    // Fallback if no external browser/handler
+                }
+            },
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = "Open GitHub profile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         )
@@ -724,4 +1130,38 @@ private fun IOSHairlineDivider() {
         thickness = 0.5.dp,
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
     )
+}
+
+private fun decodeDownsampledBitmap(context: android.content.Context, uri: android.net.Uri, maxDimension: Int): Bitmap {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val source = ImageDecoder.createSource(context.contentResolver, uri)
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            val ratio = minOf(
+                maxDimension.toFloat() / info.size.width,
+                maxDimension.toFloat() / info.size.height,
+                1f
+            )
+            decoder.setTargetSize(
+                (info.size.width * ratio).toInt().coerceAtLeast(1),
+                (info.size.height * ratio).toInt().coerceAtLeast(1)
+            )
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    } else {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream)
+        } ?: throw IllegalStateException("Unable to decode image")
+    }
+}
+
+private fun saveCroppedIconToInternalStorage(context: android.content.Context, bitmap: Bitmap): String {
+    val fileName = "home_icon_${System.currentTimeMillis()}.png"
+    val file = File(context.filesDir, fileName)
+
+    context.filesDir.listFiles { f -> f.name.startsWith("home_icon_") }?.forEach { it.delete() }
+
+    FileOutputStream(file).use { out ->
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+    }
+    return file.absolutePath
 }
