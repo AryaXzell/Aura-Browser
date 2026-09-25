@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,130 +50,155 @@ fun BrowserBottomBar(
     onGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .widthIn(max = 380.dp)
+                .fillMaxWidth(),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+            )
         ) {
-            // Back Button
-            IconButton(
-                onClick = onBack,
-                enabled = canGoBack || !isHome,
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .testTag("nav_back_button")
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Navigate back",
-                    tint = if (canGoBack || !isHome) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    }
-                )
-            }
-
-            // Forward Button
-            IconButton(
-                onClick = onForward,
-                enabled = canGoForward,
-                modifier = Modifier
-                    .size(48.dp)
-                    .testTag("nav_forward_button")
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Navigate forward",
-                    tint = if (canGoForward) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    }
-                )
-            }
-
-            // New Tab or Home Button
-            if (isHome) {
+                // Back Button
                 IconButton(
-                    onClick = onNewTab,
+                    onClick = onBack,
+                    enabled = canGoBack || !isHome,
                     modifier = Modifier
                         .size(48.dp)
-                        .testTag("nav_new_tab_button")
+                        .testTag("nav_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Navigate back",
+                        tint = if (canGoBack || !isHome) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        }
+                    )
+                }
+
+                // Forward Button
+                IconButton(
+                    onClick = onForward,
+                    enabled = canGoForward,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("nav_forward_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Navigate forward",
+                        tint = if (canGoForward) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        }
+                    )
+                }
+
+                // New Tab or Home Button
+                if (isHome) {
+                    IconButton(
+                        onClick = onNewTab,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("nav_new_tab_button")
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Open new tab",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                } else {
+                    IconButton(
+                        onClick = onGoHome,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("nav_home_button")
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = "Go to home screen",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Tab Switcher Button (Rounded square with tab count)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true),
+                            onClick = onOpenTabSwitcher
+                        )
+                        .testTag("nav_tab_switcher_button"),
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = CircleShape
+                            .size(22.dp)
+                            .border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                shape = RoundedCornerShape(6.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Open new tab",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
+                        Text(
+                            text = if (tabCount > 99) ":)" else tabCount.toString(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                }
-            } else {
-                IconButton(
-                    onClick = onGoHome,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("nav_home_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Home,
-                        contentDescription = "Go to home screen",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            // Tab Switcher Button (Rounded square with tab count)
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = true),
-                        onClick = onOpenTabSwitcher
-                    )
-                    .testTag("nav_tab_switcher_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .border(
-                            width = 2.dp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            shape = RoundedCornerShape(5.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (tabCount > 99) ":)" else tabCount.toString(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
                 }
             }
         }
