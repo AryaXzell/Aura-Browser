@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.aryaxzell.aurabrowser.data.db.BookmarkEntity
 import com.aryaxzell.aurabrowser.data.db.BrowserDatabase
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
+import com.aryaxzell.aurabrowser.data.download.DownloadTracker
+import com.aryaxzell.aurabrowser.data.model.DownloadItem
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
 import com.aryaxzell.aurabrowser.data.model.ShortcutItem
 import com.aryaxzell.aurabrowser.data.model.TabItem
@@ -86,6 +88,17 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private val _showSettingsSheet = MutableStateFlow(false)
     val showSettingsSheet: StateFlow<Boolean> = _showSettingsSheet.asStateFlow()
+
+    private val _showDownloadsSheet = MutableStateFlow(false)
+    val showDownloadsSheet: StateFlow<Boolean> = _showDownloadsSheet.asStateFlow()
+
+    val downloadTracker = DownloadTracker(application)
+    private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
+    val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
+
+    init {
+        refreshDownloads()
+    }
 
     private val _showAddShortcutDialog = MutableStateFlow(false)
     val showAddShortcutDialog: StateFlow<Boolean> = _showAddShortcutDialog.asStateFlow()
@@ -169,9 +182,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun createNewTab(url: String = "", isIncognito: Boolean = false) {
         val isHome = url.isBlank()
+        val isDownloads = url == "aurabrowser://downloads"
         val newTab = TabItem(
             id = java.util.UUID.randomUUID().toString(),
-            title = if (isHome) "Home" else "Loading...",
+            title = if (isDownloads) "Downloads" else if (isHome) "Home" else "Loading...",
             url = url,
             isHome = isHome,
             isIncognito = isIncognito,
@@ -180,7 +194,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         _tabs.update { it + newTab }
         _activeTabId.value = newTab.id
         _showTabSwitcher.value = false
-        if (!isHome) {
+        if (!isHome && !isDownloads) {
             loadUrl(url)
         }
     }
@@ -337,6 +351,27 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun setSettingsSheetVisible(visible: Boolean) {
         _showSettingsSheet.value = visible
+    }
+
+    fun setDownloadsSheetVisible(visible: Boolean) {
+        _showDownloadsSheet.value = visible
+        if (visible) {
+            refreshDownloads()
+        }
+    }
+
+    fun refreshDownloads() {
+        _downloads.value = downloadTracker.getDownloads()
+    }
+
+    fun removeDownload(id: Long) {
+        downloadTracker.removeDownload(id)
+        refreshDownloads()
+    }
+
+    fun openDownloadsTab() {
+        createNewTab(url = "aurabrowser://downloads", isIncognito = false)
+        setDownloadsSheetVisible(false)
     }
 
     fun setAddShortcutDialogVisible(visible: Boolean) {

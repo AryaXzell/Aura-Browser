@@ -32,6 +32,8 @@ import com.aryaxzell.aurabrowser.ui.components.BookmarksView
 import com.aryaxzell.aurabrowser.ui.components.BrowserBottomBar
 import com.aryaxzell.aurabrowser.ui.components.BrowserTopBar
 import com.aryaxzell.aurabrowser.ui.components.BrowserWebView
+import com.aryaxzell.aurabrowser.ui.components.DownloadsTabContent
+import com.aryaxzell.aurabrowser.ui.components.DownloadsView
 import com.aryaxzell.aurabrowser.ui.components.HistoryView
 import com.aryaxzell.aurabrowser.ui.components.HomepageView
 import com.aryaxzell.aurabrowser.ui.components.SettingsView
@@ -102,8 +104,10 @@ fun BrowserApp(viewModel: BrowserViewModel) {
     val showTabSwitcher by viewModel.showTabSwitcher.collectAsStateWithLifecycle()
     val showBookmarksSheet by viewModel.showBookmarksSheet.collectAsStateWithLifecycle()
     val showHistorySheet by viewModel.showHistorySheet.collectAsStateWithLifecycle()
+    val showDownloadsSheet by viewModel.showDownloadsSheet.collectAsStateWithLifecycle()
     val showSettingsSheet by viewModel.showSettingsSheet.collectAsStateWithLifecycle()
     val showAddShortcutDialog by viewModel.showAddShortcutDialog.collectAsStateWithLifecycle()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
     val webAction by viewModel.webAction.collectAsStateWithLifecycle()
     val isBookmarked = bookmarks.any { it.url == activeTab.url && activeTab.url.isNotBlank() }
@@ -128,6 +132,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 onToggleDesktop = { viewModel.toggleDesktopMode() },
                 onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
                 onOpenHistory = { viewModel.setHistorySheetVisible(true) },
+                onOpenDownloads = { viewModel.setDownloadsSheetVisible(true) },
                 onOpenSettings = { viewModel.setSettingsSheetVisible(true) },
                 onOpenNewTab = { isIncognito -> viewModel.createNewTab(isIncognito = isIncognito) },
                 onShareUrl = {
@@ -152,6 +157,7 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                 onBack = { viewModel.goBack() },
                 onForward = { viewModel.goForward() },
                 onNewTab = { viewModel.createNewTab() },
+                onOpenDownloads = { viewModel.setDownloadsSheetVisible(true) },
                 onOpenTabSwitcher = { viewModel.setTabSwitcherVisible(true) },
                 onGoHome = { viewModel.goHome() }
             )
@@ -183,6 +189,12 @@ fun BrowserApp(viewModel: BrowserViewModel) {
                         onAddShortcutClick = { viewModel.setAddShortcutDialogVisible(true) },
                         onHistoryItemClick = { url -> viewModel.loadUrl(url) },
                         onBookmarkItemClick = { url -> viewModel.loadUrl(url) }
+                    )
+                } else if (tabToRender.url == "aurabrowser://downloads") {
+                    DownloadsTabContent(
+                        downloads = downloads,
+                        onRefresh = { viewModel.refreshDownloads() },
+                        onDeleteDownload = { viewModel.removeDownload(it) }
                     )
                 } else {
                     BrowserWebView(
@@ -243,6 +255,17 @@ fun BrowserApp(viewModel: BrowserViewModel) {
             onDeleteHistory = { viewModel.deleteHistoryItem(it) },
             onClearAllHistory = { viewModel.clearAllHistory() },
             onDismiss = { viewModel.setHistorySheetVisible(false) }
+        )
+    }
+
+    // Downloads Sheet
+    if (showDownloadsSheet) {
+        DownloadsView(
+            downloads = downloads,
+            onRefresh = { viewModel.refreshDownloads() },
+            onDeleteDownload = { viewModel.removeDownload(it) },
+            onOpenAsTab = { viewModel.openDownloadsTab() },
+            onDismiss = { viewModel.setDownloadsSheetVisible(false) }
         )
     }
 

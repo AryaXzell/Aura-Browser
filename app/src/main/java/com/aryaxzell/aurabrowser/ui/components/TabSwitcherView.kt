@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
@@ -183,7 +184,11 @@ fun TabSwitcherView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = if (tab.isIncognito) Icons.Default.Shield else Icons.Default.Language,
+                                    imageVector = when {
+                                        tab.isIncognito -> Icons.Default.Shield
+                                        tab.url == "aurabrowser://downloads" -> Icons.Default.Download
+                                        else -> Icons.Default.Language
+                                    },
                                     contentDescription = null,
                                     tint = if (tab.isIncognito) {
                                         MaterialTheme.colorScheme.inverseOnSurface

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +47,7 @@ fun BrowserBottomBar(
     onBack: () -> Unit,
     onForward: () -> Unit,
     onNewTab: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenTabSwitcher: () -> Unit,
     onGoHome: () -> Unit,
     modifier: Modifier = Modifier
@@ -59,7 +61,7 @@ fun BrowserBottomBar(
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 380.dp)
+                .widthIn(max = 400.dp)
                 .fillMaxWidth(),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface,
@@ -74,7 +76,7 @@ fun BrowserBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(58.dp)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -165,6 +167,21 @@ fun BrowserBottomBar(
                             )
                         }
                     }
+                }
+
+                // Download Manager Button
+                IconButton(
+                    onClick = onOpenDownloads,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("nav_downloads_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download Manager",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(21.dp)
+                    )
                 }
 
                 // Tab Switcher Button (Rounded square with tab count)

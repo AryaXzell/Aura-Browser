@@ -3,8 +3,10 @@ package com.aryaxzell.aurabrowser.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,14 +22,23 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,19 +47,25 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaxzell.aurabrowser.data.model.TabItem
@@ -69,6 +86,7 @@ fun BrowserTopBar(
     onToggleDesktop: () -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     onOpenSettings: () -> Unit,
     onOpenNewTab: (Boolean) -> Unit,
     onShareUrl: () -> Unit,
@@ -286,6 +304,7 @@ fun BrowserTopBar(
                     onToggleDesktop = onToggleDesktop,
                     onOpenBookmarks = onOpenBookmarks,
                     onOpenHistory = onOpenHistory,
+                    onOpenDownloads = onOpenDownloads,
                     onOpenSettings = onOpenSettings,
                     onOpenNewTab = onOpenNewTab,
                     onShareUrl = onShareUrl
@@ -320,15 +339,16 @@ private fun TopBarMenu(
     onToggleDesktop: () -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNewTab: (Boolean) -> Unit,
     onShareUrl: () -> Unit
 ) {
-    var expanded = remember { androidx.compose.runtime.mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
 
     Box {
         IconButton(
-            onClick = { expanded.value = true },
+            onClick = { expanded = true },
             modifier = Modifier.testTag("top_menu_button")
         ) {
             Icon(
@@ -338,81 +358,165 @@ private fun TopBarMenu(
             )
         }
 
+        // iOS-style contextual dropdown menu
         DropdownMenu(
-            expanded = expanded.value,
-            onDismissRequest = { expanded.value = false },
-            modifier = Modifier.clip(RoundedCornerShape(14.dp))
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            offset = DpOffset(x = 0.dp, y = 6.dp),
+            shape = RoundedCornerShape(18.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            modifier = Modifier
+                .width(240.dp)
+                .clip(RoundedCornerShape(18.dp))
         ) {
-            if (!activeTab.isHome) {
-                DropdownMenuItem(
-                    text = { Text(if (isBookmarked) "Remove Bookmark" else "Add Bookmark") },
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (!activeTab.isHome) {
+                    IOSMenuItem(
+                        text = if (isBookmarked) "Remove Bookmark" else "Add Bookmark",
+                        icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        iconTint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        onClick = {
+                            expanded = false
+                            onToggleBookmark()
+                        }
+                    )
+                    IOSMenuItem(
+                        text = if (activeTab.isDesktopMode) "Mobile Website" else "Desktop Website",
+                        icon = Icons.Default.Laptop,
+                        onClick = {
+                            expanded = false
+                            onToggleDesktop()
+                        }
+                    )
+                    IOSMenuItem(
+                        text = "Share Page",
+                        icon = Icons.Default.Share,
+                        onClick = {
+                            expanded = false
+                            onShareUrl()
+                        }
+                    )
+                    IOSMenuItem(
+                        text = "Reload",
+                        icon = Icons.Default.Refresh,
+                        onClick = {
+                            expanded = false
+                            onReload()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+                }
+
+                IOSMenuItem(
+                    text = "New Tab",
+                    icon = Icons.Default.Add,
                     onClick = {
-                        expanded.value = false
-                        onToggleBookmark()
+                        expanded = false
+                        onOpenNewTab(false)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text(if (activeTab.isDesktopMode) "Mobile Site" else "Desktop Site") },
+
+                IOSMenuItem(
+                    text = "New Incognito Tab",
+                    icon = Icons.Default.Shield,
                     onClick = {
-                        expanded.value = false
-                        onToggleDesktop()
+                        expanded = false
+                        onOpenNewTab(true)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("Share Page") },
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                )
+
+                IOSMenuItem(
+                    text = "Bookmarks",
+                    icon = Icons.Default.Bookmarks,
                     onClick = {
-                        expanded.value = false
-                        onShareUrl()
+                        expanded = false
+                        onOpenBookmarks()
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("Reload") },
+
+                IOSMenuItem(
+                    text = "History",
+                    icon = Icons.Default.History,
                     onClick = {
-                        expanded.value = false
-                        onReload()
+                        expanded = false
+                        onOpenHistory()
+                    }
+                )
+
+                IOSMenuItem(
+                    text = "Downloads",
+                    icon = Icons.Default.Download,
+                    onClick = {
+                        expanded = false
+                        onOpenDownloads()
+                    }
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                )
+
+                IOSMenuItem(
+                    text = "Settings",
+                    icon = Icons.Default.Settings,
+                    onClick = {
+                        expanded = false
+                        onOpenSettings()
                     }
                 )
             }
-
-            DropdownMenuItem(
-                text = { Text("New Tab") },
-                onClick = {
-                    expanded.value = false
-                    onOpenNewTab(false)
-                }
-            )
-
-            DropdownMenuItem(
-                text = { Text("New Incognito Tab") },
-                onClick = {
-                    expanded.value = false
-                    onOpenNewTab(true)
-                }
-            )
-
-            DropdownMenuItem(
-                text = { Text("Bookmarks") },
-                onClick = {
-                    expanded.value = false
-                    onOpenBookmarks()
-                }
-            )
-
-            DropdownMenuItem(
-                text = { Text("History") },
-                onClick = {
-                    expanded.value = false
-                    onOpenHistory()
-                }
-            )
-
-            DropdownMenuItem(
-                text = { Text("Settings") },
-                onClick = {
-                    expanded.value = false
-                    onOpenSettings()
-                }
-            )
         }
+    }
+}
+
+@Composable
+private fun IOSMenuItem(
+    text: String,
+    icon: ImageVector,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Normal
+            ),
+            color = textColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(19.dp)
+        )
     }
 }
