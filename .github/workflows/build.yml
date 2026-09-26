@@ -27,6 +27,18 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      - name: Restore persistent debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::error::Secret DEBUG_KEYSTORE_BASE64 belum di-set. Setiap build akan menghasilkan APK dengan signature berbeda, menyebabkan Android menolak instalasi update tanpa uninstall dulu. Lihat dokumentasi PRD untuk langkah setup."
+            exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+          echo "Debug keystore berhasil di-restore ke ~/.android/debug.keystore"
+
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 

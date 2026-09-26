@@ -1,3 +1,17 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.TimeZone
+import java.util.Locale
+
+fun generateVersionCode(): Int {
+    // Format: YYMMDDHH sebagai Int — menjamin nilai yang selalu naik seiring waktu,
+    // sekaligus tetap dalam batas aman Int (maksimum versionCode yang diizinkan Play Store
+    // adalah 2100000000 — format YYMMDDHH menghasilkan nilai jauh di bawah itu hingga tahun 2099).
+    val formatter = SimpleDateFormat("yyMMddHH", Locale.US)
+    formatter.timeZone = TimeZone.getTimeZone("UTC")
+    return formatter.format(Date()).toInt()
+}
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -12,7 +26,7 @@ android {
     applicationId = "com.aryaxzell.aurabrowser"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
+    versionCode = generateVersionCode()
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -29,11 +43,41 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val keystorePathEnv = System.getenv("KEYSTORE_PATH")
+      val defaultKeystoreFile = file("${rootDir}/aura-browser-release.jks")
+      val resolvedKeystoreFile = if (!keystorePathEnv.isNullOrBlank()) {
+          file(keystorePathEnv)
+      } else {
+          defaultKeystoreFile
+      }
+
+      val isReleaseBuild = gradle.startParameter.taskNames.any { task ->
+          task.contains("Release", ignoreCase = true) || task == "assemble" || task == "build"
+      }
+
+      if (isReleaseBuild) {
+          if (!resolvedKeystoreFile.exists()) {
+              throw org.gradle.api.GradleException(
+                  "Release keystore tidak ditemukan di '${resolvedKeystoreFile.absolutePath}'. " +
+                  "JANGAN generate keystore baru secara otomatis untuk build release — ini akan " +
+                  "menyebabkan signature mismatch dengan versi yang sudah terinstall di device manapun. " +
+                  "Salin keystore release yang SAMA (dibuat sekali, disimpan persisten) ke path ini, " +
+                  "atau set environment variable KEYSTORE_PATH menunjuk ke lokasinya sebelum build dijalankan."
+              )
+          }
+
+          storeFile = resolvedKeystoreFile
+          storePassword = System.getenv("STORE_PASSWORD")
+              ?: throw org.gradle.api.GradleException("Environment variable STORE_PASSWORD belum di-set untuk build release.")
+          keyAlias = "upload"
+          keyPassword = System.getenv("KEY_PASSWORD")
+              ?: throw org.gradle.api.GradleException("Environment variable KEY_PASSWORD belum di-set untuk build release.")
+      } else {
+          storeFile = resolvedKeystoreFile
+          storePassword = System.getenv("STORE_PASSWORD") ?: "dummy_password"
+          keyAlias = "upload"
+          keyPassword = System.getenv("KEY_PASSWORD") ?: "dummy_password"
+      }
     }
   }
 
