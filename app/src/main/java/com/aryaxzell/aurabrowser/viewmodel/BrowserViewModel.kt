@@ -518,6 +518,13 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun onReceivedTitle(tabId: String, title: String) {
+        if (title.isBlank() || title.startsWith("http")) return
+        updateTab(tabId) {
+            it.copy(title = title)
+        }
+    }
+
     fun onPageFinished(tabId: String, url: String, title: String?, canGoBack: Boolean, canGoForward: Boolean) {
         val pageTitle = if (!title.isNullOrBlank() && !title.startsWith("http")) title else url
         updateTab(tabId) {
@@ -585,15 +592,17 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         if (tab.url.isBlank()) return
 
         val tabHost = try {
-            java.net.URI(tab.url).host?.removePrefix("www.")
+            android.net.Uri.parse(tab.url).host?.removePrefix("www.")
         } catch (e: Exception) {
+            android.util.Log.e("BrowserViewModel", "Error parsing tab URL: ${tab.url}", e)
             null
         } ?: return
 
         val matchingShortcut = _shortcuts.value.find { shortcut ->
             val shortcutHost = try {
-                java.net.URI(shortcut.url).host?.removePrefix("www.")
+                android.net.Uri.parse(shortcut.url).host?.removePrefix("www.")
             } catch (e: Exception) {
+                android.util.Log.e("BrowserViewModel", "Error parsing shortcut URL: ${shortcut.url}", e)
                 null
             }
             shortcutHost == tabHost && shortcut.faviconBase64 == null

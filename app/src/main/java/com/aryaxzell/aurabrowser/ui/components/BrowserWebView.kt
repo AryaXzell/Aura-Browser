@@ -94,6 +94,7 @@ fun BrowserWebView(
     onActionConsumed: () -> Unit,
     onPageStarted: (tabId: String, url: String) -> Unit,
     onPageFinished: (tabId: String, url: String, title: String?, canGoBack: Boolean, canGoForward: Boolean) -> Unit,
+    onReceivedTitle: ((tabId: String, title: String) -> Unit)? = null,
     onProgressChanged: (tabId: String, progress: Int) -> Unit,
     onReceivedError: (tabId: String, description: String, isOffline: Boolean) -> Unit,
     onFaviconReceived: (tabId: String, faviconBase64: String) -> Unit,
@@ -115,15 +116,17 @@ fun BrowserWebView(
 
     // Intercept back button for WebView navigation
     BackHandler(enabled = !isActiveTabHome) {
-        if (webViewInstance?.canGoBack() == true) {
-            webViewInstance?.goBack()
+        val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+        if (safeWebView?.canGoBack() == true) {
+            safeWebView.goBack()
         } else {
             onRetry() // Fallback to home
         }
     }
 
     fun applyUserAgentForCurrentMode() {
-        webViewInstance?.settings?.let { settings ->
+        val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+        safeWebView?.settings?.let { settings ->
             if (isActiveTabDesktopMode) {
                 settings.userAgentString = DESKTOP_USER_AGENT
             } else if (defaultUserAgent.isNotBlank()) {
@@ -137,26 +140,29 @@ fun BrowserWebView(
     // Handle ViewModel actions (Reload, Stop, GoBack, GoForward, LoadUrl)
     LaunchedEffect(webAction) {
         val action = webAction ?: return@LaunchedEffect
-        when (action) {
-            is BrowserViewModel.WebAction.LoadUrl -> {
-                applyUserAgentForCurrentMode()
-                webViewInstance?.loadUrl(action.url)
-            }
-            is BrowserViewModel.WebAction.Reload -> {
-                applyUserAgentForCurrentMode()
-                webViewInstance?.reload()
-            }
-            is BrowserViewModel.WebAction.Stop -> {
-                webViewInstance?.stopLoading()
-            }
-            is BrowserViewModel.WebAction.GoBack -> {
-                if (webViewInstance?.canGoBack() == true) {
-                    webViewInstance?.goBack()
+        val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+        if (safeWebView != null) {
+            when (action) {
+                is BrowserViewModel.WebAction.LoadUrl -> {
+                    applyUserAgentForCurrentMode()
+                    safeWebView.loadUrl(action.url)
                 }
-            }
-            is BrowserViewModel.WebAction.GoForward -> {
-                if (webViewInstance?.canGoForward() == true) {
-                    webViewInstance?.goForward()
+                is BrowserViewModel.WebAction.Reload -> {
+                    applyUserAgentForCurrentMode()
+                    safeWebView.reload()
+                }
+                is BrowserViewModel.WebAction.Stop -> {
+                    safeWebView.stopLoading()
+                }
+                is BrowserViewModel.WebAction.GoBack -> {
+                    if (safeWebView.canGoBack() == true) {
+                        safeWebView.goBack()
+                    }
+                }
+                is BrowserViewModel.WebAction.GoForward -> {
+                    if (safeWebView.canGoForward() == true) {
+                        safeWebView.goForward()
+                    }
                 }
             }
         }
@@ -169,14 +175,16 @@ fun BrowserWebView(
             isFirstAdBlockComposition = false
             return@LaunchedEffect
         }
-        if (!isActiveTabHome && webViewInstance != null) {
-            webViewInstance?.reload()
+        val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+        if (!isActiveTabHome && safeWebView != null) {
+            safeWebView.reload()
         }
     }
 
     // Reactively update JavaScript setting
     LaunchedEffect(isJavaScriptEnabled) {
-        webViewInstance?.settings?.javaScriptEnabled = isJavaScriptEnabled
+        val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+        safeWebView?.settings?.javaScriptEnabled = isJavaScriptEnabled
     }
 
     // Apply User Agent when tab entry or defaultUserAgent is captured
@@ -189,7 +197,8 @@ fun BrowserWebView(
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
-            webViewInstance?.reload()
+            val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
+            safeWebView?.reload()
         },
         state = pullToRefreshState,
         modifier = modifier.fillMaxSize()
@@ -261,13 +270,7 @@ fun BrowserWebView(
 
                             override fun onReceivedTitle(view: WebView?, title: String?) {
                                 if (view != null && !title.isNullOrBlank()) {
-                                    onPageFinished(
-                                        activeTabId,
-                                        view.url ?: activeTabUrl,
-                                        title,
-                                        view.canGoBack(),
-                                        view.canGoForward()
-                                    )
+                                    onReceivedTitle?.invoke(activeTabId, title)
                                 }
                             }
 
@@ -364,6 +367,9 @@ fun BrowserWebView(
                                     ctx.startActivity(intent)
                                     true
                                 } catch (e: Exception) {
+                                    try {
+                                        android.widget.Toast.makeText(ctx, "No app found to open this link", android.widget.Toast.LENGTH_SHORT).show()
+                                    } catch (_: Exception) {}
                                     true
                                 }
                             }
@@ -399,9 +405,11 @@ fun BrowserWebView(
                                     }
 
                                     // RAM Cache: Serve static/CDN assets directly from memory to minimize disk I/O and load instantly
-                                    val cachedResponse = com.aryaxzell.aurabrowser.data.cache.MemoryCache.handleIntercept(request)
-                                    if (cachedResponse != null) {
-                                        return cachedResponse
+                                    if (!isActiveTabIncognito) {
+                                        val cachedResponse = com.aryaxzell.aurabrowser.data.cache.MemoryCache.handleIntercept(request)
+                                        if (cachedResponse != null) {
+                                            return cachedResponse
+                                        }
                                     }
                                 }
                                 return super.shouldInterceptRequest(view, request)

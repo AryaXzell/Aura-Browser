@@ -4,8 +4,6 @@ import android.util.LruCache
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import java.io.ByteArrayInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * In-memory LRU cache for static web resources (CSS, JS, images, fonts).
@@ -13,7 +11,7 @@ import java.net.URL
  * static assets directly from RAM, specifically tailored for low-end devices.
  */
 object MemoryCache {
-    // Max 8MB of static assets in RAM to prevent memory pressure on low-end devices (RAM 2-3GB)
+    // Max 8MB of static assets in RAM to prevent memory pressure
     private val maxCacheSize = 8 * 1024 * 1024
     
     private val cache = object : LruCache<String, CachedResource>(maxCacheSize) {
@@ -26,11 +24,19 @@ object MemoryCache {
         val mimeType: String,
         val encoding: String,
         val data: ByteArray,
-        val responseHeaders: Map<String, String>?
+        val responseHeaders: Map<String, String>?,
+        val expiresAt: Long? = null
     )
 
     fun get(url: String): WebResourceResponse? {
         val cached = cache.get(url) ?: return null
+        
+        // Respect HTTP Cache-freshness (max-age / Expires)
+        if (cached.expiresAt != null && System.currentTimeMillis() > cached.expiresAt) {
+            cache.remove(url)
+            return null
+        }
+
         val stream = ByteArrayInputStream(cached.data)
         return WebResourceResponse(
             cached.mimeType,
@@ -42,10 +48,38 @@ object MemoryCache {
         )
     }
 
+    @Suppress("DEPRECATION")
     fun put(url: String, mimeType: String, encoding: String, data: ByteArray, headers: Map<String, String>?) {
         // Only cache resources smaller than 1.5MB to avoid clogging the RAM cache
         if (data.size > 1536 * 1024) return
-        cache.put(url, CachedResource(mimeType, encoding, data, headers))
+
+        // Respect Cache-Control: no-store / no-cache
+        val cacheControl = headers?.entries?.firstOrNull { it.key.equals("Cache-Control", ignoreCase = true) }?.value?.lowercase() ?: ""
+        if (cacheControl.contains("no-store") || cacheControl.contains("no-cache")) {
+            return
+        }
+
+        // Parse max-age or Expires for freshness
+        var expiresAt: Long? = null
+        if (cacheControl.contains("max-age=")) {
+            try {
+                val maxAgePart = cacheControl.substringAfter("max-age=").substringBefore(",").trim()
+                val maxAgeSeconds = maxAgePart.toLongOrNull()
+                if (maxAgeSeconds != null) {
+                    expiresAt = System.currentTimeMillis() + (maxAgeSeconds * 1000)
+                }
+            } catch (_: Exception) {}
+        } else {
+            val expiresHeader = headers?.entries?.firstOrNull { it.key.equals("Expires", ignoreCase = true) }?.value
+            if (expiresHeader != null) {
+                try {
+                    val parsedDate = java.util.Date(expiresHeader)
+                    expiresAt = parsedDate.time
+                } catch (_: Exception) {}
+            }
+        }
+
+        cache.put(url, CachedResource(mimeType, encoding, data, headers, expiresAt))
     }
 
     fun clear() {
@@ -55,6 +89,7 @@ object MemoryCache {
     /**
      * Intercepts and caches static GET requests (CDNs, libraries, common assets).
      * Bypasses the disk database entirely for these items.
+     * All blocking synchronous I/O has been removed from this path to prevent stalling page rendering.
      */
     fun handleIntercept(request: WebResourceRequest): WebResourceResponse? {
         val url = request.url.toString()
@@ -78,68 +113,7 @@ object MemoryCache {
 
         if (!isStatic) return null
 
-        // 1. Try memory cache first (instant, O(1), zero I/O)
-        val cached = get(url)
-        if (cached != null) {
-            return cached
-        }
-
-        // 2. Fetch and populate cache for public/CDN/static assets
-        val isCdnOrStaticAsset = url.contains("cdn") ||
-                                 url.contains("bootstrap") ||
-                                 url.contains("jquery") ||
-                                 url.contains("cdnjs") ||
-                                 url.contains("fonts.gstatic") ||
-                                 url.contains("googleapis") ||
-                                 url.contains("wp-content") ||
-                                 url.contains("assets") ||
-                                 url.contains("static")
-
-        if (isCdnOrStaticAsset) {
-            try {
-                val conn = URL(url).openConnection() as HttpURLConnection
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
-                
-                // Forward request headers
-                request.requestHeaders.forEach { (key, value) ->
-                    conn.setRequestProperty(key, value)
-                }
-                
-                conn.connect()
-                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                    val contentType = conn.contentType ?: "application/octet-stream"
-                    val mimeType = contentType.substringBefore(";").trim()
-                    val encoding = if (contentType.contains("charset=")) {
-                        contentType.substringAfter("charset=").substringBefore(";").trim()
-                    } else {
-                        "UTF-8"
-                    }
-
-                    val responseHeaders = mutableMapOf<String, String>()
-                    conn.headerFields.forEach { (key, values) ->
-                        if (key != null && values.isNotEmpty()) {
-                            responseHeaders[key] = values.joinToString(", ")
-                        }
-                    }
-
-                    val data = conn.inputStream.use { it.readBytes() }
-                    put(url, mimeType, encoding, data, responseHeaders)
-
-                    return WebResourceResponse(
-                        mimeType,
-                        encoding,
-                        200,
-                        "OK",
-                        responseHeaders,
-                        ByteArrayInputStream(data)
-                    )
-                }
-            } catch (e: Exception) {
-                // Graceful fallback: let default WebView flow handle it
-            }
-        }
-
-        return null
+        // Try memory cache first (instant, O(1), zero I/O)
+        return get(url)
     }
 }

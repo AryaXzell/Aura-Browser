@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import androidx.activity.compose.BackHandler
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -35,8 +36,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.BlurOn
@@ -153,28 +156,14 @@ fun SettingsView(
 
     val tabs = listOf("General", "Appearance", "Privacy", "Browser")
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        var visible by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { visible = true }
+    BackHandler {
+        onDismiss()
+    }
 
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(animationSpec = tween(200)) + slideInVertically(
-                initialOffsetY = { it / 10 },
-                animationSpec = tween(200)
-            ),
-            exit = fadeOut(animationSpec = tween(150))
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -182,37 +171,41 @@ fun SettingsView(
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    // iOS Modal Header
+                    // iOS Navigation Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        TextButton(onClick = onDismiss) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                    contentDescription = "Kembali",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Kembali",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
                         Text(
                             text = "Settings",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 22.sp
-                            ),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    shape = CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close settings",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
+                        TextButton(onClick = onDismiss) {
+                            Text(
+                                text = "Selesai",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -279,10 +272,6 @@ fun SettingsView(
                                         onToggleAdBlock = onToggleAdBlock,
                                         isDoNotTrack = isDoNotTrack,
                                         onToggleDoNotTrack = onToggleDoNotTrack,
-                                        dnsProvider = dnsProvider,
-                                        dnsCustomValue = dnsCustomValue,
-                                        onUpdateDnsProvider = onUpdateDnsProvider,
-                                        onUpdateDnsCustomValue = onUpdateDnsCustomValue,
                                         onOpenClearData = { showClearDataDialog = true }
                                     )
                                     3 -> BrowserTabContent(
@@ -297,8 +286,6 @@ fun SettingsView(
                     }
                 }
             }
-        }
-    }
 
     // Name Edit Dialog
     if (showNameEditDialog) {
@@ -493,10 +480,6 @@ private fun PrivacyTabContent(
     onToggleAdBlock: (Boolean) -> Unit,
     isDoNotTrack: Boolean,
     onToggleDoNotTrack: (Boolean) -> Unit,
-    dnsProvider: String,
-    dnsCustomValue: String,
-    onUpdateDnsProvider: (String) -> Unit,
-    onUpdateDnsCustomValue: (String) -> Unit,
     onOpenClearData: () -> Unit
 ) {
     val context = LocalContext.current
@@ -532,120 +515,6 @@ private fun PrivacyTabContent(
                     checked = isDoNotTrack,
                     onCheckedChange = onToggleDoNotTrack
                 )
-            }
-        )
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    // Card: Secure & Private DNS
-    var showDnsDialog by remember { mutableStateOf(false) }
-
-    IOSCardGroup(
-        header = "SECURE & PRIVATE DNS",
-        footer = "Encrypt your DNS queries with Secure DNS (DoH/DoT) to prevent snooping and tampering by your ISP."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Language,
-            iconBgColor = Color(0xFF5856D6), // iOS System Purple
-            title = "Secure DNS Provider",
-            subtitle = when(dnsProvider) {
-                "system" -> "Default (System)"
-                "cloudflare" -> "Cloudflare (1.1.1.1)"
-                "google" -> "Google DNS (8.8.8.8)"
-                "adguard" -> "AdGuard DNS"
-                "custom" -> if (dnsCustomValue.isBlank()) "Custom (Not set)" else "Custom: $dnsCustomValue"
-                else -> dnsProvider
-            },
-            trailingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = when(dnsProvider) {
-                            "system" -> "System"
-                            "cloudflare" -> "Cloudflare"
-                            "google" -> "Google"
-                            "adguard" -> "AdGuard"
-                            "custom" -> "Custom"
-                            else -> "System"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            },
-            onClick = { showDnsDialog = true }
-        )
-    }
-
-    if (showDnsDialog) {
-        var selectedProvider by remember { mutableStateOf(dnsProvider) }
-        var customValueInput by remember { mutableStateOf(dnsCustomValue) }
-
-        AlertDialog(
-            onDismissRequest = { showDnsDialog = false },
-            title = { Text("Pilih Secure DNS") },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    val dnsList = listOf(
-                        "system" to "Sistem (Bawaan)",
-                        "cloudflare" to "Cloudflare (1.1.1.1)",
-                        "google" to "Google Public DNS",
-                        "adguard" to "AdGuard DNS",
-                        "custom" to "DNS Kustom (IP / DoH)"
-                    )
-
-                    dnsList.forEach { (prov, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedProvider = prov }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.material3.RadioButton(
-                                selected = (selectedProvider == prov),
-                                onClick = { selectedProvider = prov }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-
-                    if (selectedProvider == "custom") {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = customValueInput,
-                            onValueChange = { customValueInput = it },
-                            label = { Text("IP atau Domain DNS (DoH)") },
-                            placeholder = { Text("https://example.com/dns-query") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onUpdateDnsProvider(selectedProvider)
-                        onUpdateDnsCustomValue(customValueInput)
-                        showDnsDialog = false
-                    }
-                ) {
-                    Text("Simpan")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDnsDialog = false }) {
-                    Text("Batal")
-                }
             }
         )
     }

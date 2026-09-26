@@ -12,6 +12,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -313,6 +316,9 @@ fun BrowserApp(
                         onPageFinished = { tabId, url, title, canGoBack, canGoForward ->
                             viewModel.onPageFinished(tabId, url, title, canGoBack, canGoForward)
                         },
+                        onReceivedTitle = { tabId, title ->
+                            viewModel.onReceivedTitle(tabId, title)
+                        },
                         onProgressChanged = { tabId, progress -> viewModel.onProgressChanged(tabId, progress) },
                         onReceivedError = { tabId, desc, isOffline -> viewModel.onReceivedError(tabId, desc, isOffline) },
                         onFaviconReceived = { tabId, favicon -> viewModel.onFaviconReceived(tabId, favicon) },
@@ -338,8 +344,15 @@ fun BrowserApp(
         )
     }
 
+    val slideIn = slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300))
+    val slideOut = slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300))
+
     // Bookmarks Sheet
-    if (showBookmarksSheet) {
+    AnimatedVisibility(
+        visible = showBookmarksSheet,
+        enter = slideIn,
+        exit = slideOut
+    ) {
         BookmarksView(
             bookmarks = bookmarks,
             onSelectBookmark = { url ->
@@ -347,12 +360,24 @@ fun BrowserApp(
                 viewModel.setBookmarksSheetVisible(false)
             },
             onDeleteBookmark = { viewModel.deleteBookmark(it) },
+            onSwitchToHistory = {
+                viewModel.setBookmarksSheetVisible(false)
+                viewModel.setHistorySheetVisible(true)
+            },
+            onSwitchToDownloads = {
+                viewModel.setBookmarksSheetVisible(false)
+                viewModel.setDownloadsSheetVisible(true)
+            },
             onDismiss = { viewModel.setBookmarksSheetVisible(false) }
         )
     }
 
     // History Sheet
-    if (showHistorySheet) {
+    AnimatedVisibility(
+        visible = showHistorySheet,
+        enter = slideIn,
+        exit = slideOut
+    ) {
         HistoryView(
             history = history,
             onSelectHistory = { url ->
@@ -361,23 +386,47 @@ fun BrowserApp(
             },
             onDeleteHistory = { viewModel.deleteHistoryItem(it) },
             onClearAllHistory = { viewModel.clearAllHistory() },
+            onSwitchToBookmarks = {
+                viewModel.setHistorySheetVisible(false)
+                viewModel.setBookmarksSheetVisible(true)
+            },
+            onSwitchToDownloads = {
+                viewModel.setHistorySheetVisible(false)
+                viewModel.setDownloadsSheetVisible(true)
+            },
             onDismiss = { viewModel.setHistorySheetVisible(false) }
         )
     }
 
     // Downloads Sheet
-    if (showDownloadsSheet) {
+    AnimatedVisibility(
+        visible = showDownloadsSheet,
+        enter = slideIn,
+        exit = slideOut
+    ) {
         DownloadsView(
             downloads = downloads,
             onRefresh = { coroutineScope.launch { viewModel.refreshDownloads() } },
             onDeleteDownload = { viewModel.removeDownload(it) },
             onOpenAsTab = { viewModel.openDownloadsTab() },
+            onSwitchToBookmarks = {
+                viewModel.setDownloadsSheetVisible(false)
+                viewModel.setBookmarksSheetVisible(true)
+            },
+            onSwitchToHistory = {
+                viewModel.setDownloadsSheetVisible(false)
+                viewModel.setHistorySheetVisible(true)
+            },
             onDismiss = { viewModel.setDownloadsSheetVisible(false) }
         )
     }
 
     // Settings Sheet
-    if (showSettingsSheet) {
+    AnimatedVisibility(
+        visible = showSettingsSheet,
+        enter = slideIn,
+        exit = slideOut
+    ) {
         SettingsView(
             currentSearchEngine = searchEngine,
             onSelectSearchEngine = { viewModel.updateSearchEngine(it) },
