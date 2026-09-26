@@ -216,7 +216,14 @@ fun BrowserWebView(
                         newView.settings.javaScriptEnabled = isJavaScriptEnabled
                         newView.settings.domStorageEnabled = true
                         newView.settings.databaseEnabled = true
-                        newView.settings.cacheMode = WebSettings.LOAD_DEFAULT
+                        
+                        // Intelligent caching to reduce disk I/O and load faster
+                        val isConnected = isNetworkAvailable(ctx)
+                        newView.settings.cacheMode = if (isConnected) {
+                            WebSettings.LOAD_DEFAULT
+                        } else {
+                            WebSettings.LOAD_CACHE_ELSE_NETWORK
+                        }
                         newView.settings.builtInZoomControls = true
                         newView.settings.displayZoomControls = false
                         newView.settings.setSupportZoom(true)
@@ -389,6 +396,12 @@ fun BrowserWebView(
                                             "UTF-8",
                                             ByteArrayInputStream(ByteArray(0))
                                         )
+                                    }
+
+                                    // RAM Cache: Serve static/CDN assets directly from memory to minimize disk I/O and load instantly
+                                    val cachedResponse = com.aryaxzell.aurabrowser.data.cache.MemoryCache.handleIntercept(request)
+                                    if (cachedResponse != null) {
+                                        return cachedResponse
                                     }
                                 }
                                 return super.shouldInterceptRequest(view, request)
