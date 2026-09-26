@@ -1,5 +1,7 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,10 +34,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +52,7 @@ fun BrowserBottomBar(
     canGoForward: Boolean,
     tabCount: Int,
     isHome: Boolean,
+    themeColor: Int? = null,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onNewTab: () -> Unit,
@@ -58,26 +63,45 @@ fun BrowserBottomBar(
     onGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
+    val defaultContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+    val websiteThemeColor = themeColor?.let { Color(it).copy(alpha = 0.88f) }
+    val targetContainerColor = if (!isHome && websiteThemeColor != null) websiteThemeColor else defaultContainerColor
+    val animatedContainerColor by animateColorAsState(
+        targetValue = targetContainerColor,
+        animationSpec = tween(durationMillis = 350),
+        label = "bottom_bar_theme_color"
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = animatedContainerColor,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+        )
     ) {
-        Surface(
+        Box(
             modifier = Modifier
-                .widthIn(max = 420.dp)
-                .fillMaxWidth(),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
-            )
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
         ) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 420.dp)
+                    .fillMaxWidth(),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                tonalElevation = 2.dp,
+                shadowElevation = 4.dp,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                )
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -261,4 +285,5 @@ fun BrowserBottomBar(
             }
         }
     }
+}
 }

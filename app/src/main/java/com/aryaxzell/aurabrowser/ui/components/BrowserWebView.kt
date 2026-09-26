@@ -22,6 +22,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import com.aryaxzell.aurabrowser.data.adblock.AdBlockEngine
+import com.aryaxzell.aurabrowser.data.download.DownloadTracker
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -67,21 +69,6 @@ import com.aryaxzell.aurabrowser.viewmodel.BrowserViewModel
 import com.aryaxzell.aurabrowser.webview.WebViewPoolManager
 import java.io.ByteArrayInputStream
 
-private val AD_DOMAINS = arrayOf(
-    "doubleclick.net",
-    "googleadservices.com",
-    "googlesyndication.com",
-    "adnxs.com",
-    "criteo.com",
-    "scorecardresearch.com",
-    "outbrain.com",
-    "taboola.com",
-    "amazon-adsystem.com",
-    "adservice.google",
-    "facebook.net/en_US/fbevents.js",
-    "ads.pubmatic.com"
-)
-
 private const val DESKTOP_USER_AGENT =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
@@ -89,8 +76,17 @@ private const val DESKTOP_USER_AGENT =
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun BrowserWebView(
-    activeTab: TabItem,
+    activeTabId: String,
+    activeTabUrl: String,
+    isActiveTabHome: Boolean,
+    isActiveTabIncognito: Boolean,
+    isActiveTabDesktopMode: Boolean,
+    isActiveTabOffline: Boolean,
+    activeTabErrorMessage: String?,
+    isActiveTabLoading: Boolean,
     webViewPoolManager: WebViewPoolManager,
+    adBlockEngine: AdBlockEngine,
+    downloadTracker: DownloadTracker? = null,
     isAdBlockEnabled: Boolean,
     isJavaScriptEnabled: Boolean,
     isDoNotTrack: Boolean,
@@ -101,6 +97,7 @@ fun BrowserWebView(
     onProgressChanged: (tabId: String, progress: Int) -> Unit,
     onReceivedError: (tabId: String, description: String, isOffline: Boolean) -> Unit,
     onFaviconReceived: (tabId: String, faviconBase64: String) -> Unit,
+    onThemeColorReceived: ((tabId: String, colorInt: Int?) -> Unit)? = null,
     onShowFileChooser: (Intent, ValueCallback<Array<Uri>>) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -109,14 +106,15 @@ fun BrowserWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var defaultUserAgent by remember { mutableStateOf("") }
     val currentAdBlockState by rememberUpdatedState(isAdBlockEnabled)
-    var isFirstAdBlockComposition by remember(activeTab.id) { mutableStateOf(true) }
+    val currentDoNotTrackState by rememberUpdatedState(isDoNotTrack)
+    var isFirstAdBlockComposition by remember(activeTabId) { mutableStateOf(true) }
 
     // Pull to Refresh state tied to active tab loading
-    val isRefreshing = activeTab.isLoading
+    val isRefreshing = isActiveTabLoading
     val pullToRefreshState = rememberPullToRefreshState()
 
     // Intercept back button for WebView navigation
-    BackHandler(enabled = !activeTab.isHome) {
+    BackHandler(enabled = !isActiveTabHome) {
         if (webViewInstance?.canGoBack() == true) {
             webViewInstance?.goBack()
         } else {
@@ -126,7 +124,7 @@ fun BrowserWebView(
 
     fun applyUserAgentForCurrentMode() {
         webViewInstance?.settings?.let { settings ->
-            if (activeTab.isDesktopMode) {
+            if (isActiveTabDesktopMode) {
                 settings.userAgentString = DESKTOP_USER_AGENT
             } else if (defaultUserAgent.isNotBlank()) {
                 settings.userAgentString = defaultUserAgent
@@ -171,7 +169,7 @@ fun BrowserWebView(
             isFirstAdBlockComposition = false
             return@LaunchedEffect
         }
-        if (!activeTab.isHome && webViewInstance != null) {
+        if (!isActiveTabHome && webViewInstance != null) {
             webViewInstance?.reload()
         }
     }
@@ -182,7 +180,7 @@ fun BrowserWebView(
     }
 
     // Apply User Agent when tab entry or defaultUserAgent is captured
-    LaunchedEffect(activeTab.id, defaultUserAgent) {
+    LaunchedEffect(activeTabId, defaultUserAgent) {
         if (defaultUserAgent.isNotBlank()) {
             applyUserAgentForCurrentMode()
         }
@@ -197,12 +195,12 @@ fun BrowserWebView(
         modifier = modifier.fillMaxSize()
     ) {
         // key ensures separate composition scope per tabId
-        key(activeTab.id) {
+        key(activeTabId) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    val isNewInstance = !webViewPoolManager.hasWebView(activeTab.id)
-                    val webView = webViewPoolManager.getOrCreateWebView(activeTab.id, ctx) { newView ->
+                    val isNewInstance = !webViewPoolManager.hasWebView(activeTabId)
+                    val webView = webViewPoolManager.getOrCreateWebView(activeTabId, ctx) { newView ->
                         newView.layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -226,8 +224,8 @@ fun BrowserWebView(
                         newView.settings.allowContentAccess = false
 
                         // Cookie setup
-                        CookieManager.getInstance().setAcceptCookie(!activeTab.isIncognito)
-                        CookieManager.getInstance().setAcceptThirdPartyCookies(newView, !activeTab.isIncognito)
+                        CookieManager.getInstance().setAcceptCookie(!isActiveTabIncognito)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(newView, !isActiveTabIncognito)
 
                         // Download listener using Android DownloadManager
                         newView.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
@@ -241,7 +239,8 @@ fun BrowserWebView(
                                     setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
                                 }
                                 val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                dm.enqueue(request)
+                                val downloadId = dm.enqueue(request)
+                                downloadTracker?.registerOwnedDownload(downloadId)
                                 Toast.makeText(ctx, "Download started: ${URLUtil.guessFileName(url, contentDisposition, mimetype)}", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
                                 Toast.makeText(ctx, "Unable to start download: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
@@ -250,14 +249,14 @@ fun BrowserWebView(
 
                         newView.webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                onProgressChanged(activeTab.id, newProgress)
+                                onProgressChanged(activeTabId, newProgress)
                             }
 
                             override fun onReceivedTitle(view: WebView?, title: String?) {
                                 if (view != null && !title.isNullOrBlank()) {
                                     onPageFinished(
-                                        activeTab.id,
-                                        view.url ?: activeTab.url,
+                                        activeTabId,
+                                        view.url ?: activeTabUrl,
                                         title,
                                         view.canGoBack(),
                                         view.canGoForward()
@@ -273,7 +272,7 @@ fun BrowserWebView(
                                         val outputStream = java.io.ByteArrayOutputStream()
                                         scaled.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
                                         val base64 = android.util.Base64.encodeToString(outputStream.toByteArray(), android.util.Base64.NO_WRAP)
-                                        onFaviconReceived(activeTab.id, base64)
+                                        onFaviconReceived(activeTabId, base64)
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                     }
@@ -302,19 +301,44 @@ fun BrowserWebView(
                         newView.webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
-                                url?.let { onPageStarted(activeTab.id, it) }
+                                url?.let { onPageStarted(activeTabId, it) }
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 if (view != null) {
                                     onPageFinished(
-                                        activeTab.id,
+                                        activeTabId,
                                         url ?: view.url.orEmpty(),
                                         view.title,
                                         view.canGoBack(),
                                         view.canGoForward()
                                     )
+
+                                    view.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            var meta = document.querySelector('meta[name="theme-color"]');
+                                            if (meta && meta.content) return meta.content;
+                                            var header = document.querySelector('header') || document.querySelector('nav');
+                                            if (header) {
+                                                var bg = window.getComputedStyle(header).backgroundColor;
+                                                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+                                            }
+                                            var bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                                            if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') return bodyBg;
+                                            return null;
+                                        })()
+                                        """.trimIndent()
+                                    ) { rawResult ->
+                                        if (!rawResult.isNullOrBlank() && rawResult != "null" && rawResult != "\"null\"") {
+                                            val clean = rawResult.replace("\"", "").trim()
+                                            val parsedColor = parseColorString(clean)
+                                            if (parsedColor != null) {
+                                                onThemeColorReceived?.invoke(activeTabId, parsedColor)
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -341,16 +365,30 @@ fun BrowserWebView(
                                 view: WebView?,
                                 request: WebResourceRequest?
                             ): WebResourceResponse? {
-                                if (currentAdBlockState && request != null) {
+                                if (request != null) {
                                     val host = request.url.host?.lowercase() ?: ""
-                                    for (domain in AD_DOMAINS) {
-                                        if (host.contains(domain)) {
-                                            return WebResourceResponse(
-                                                "text/plain",
-                                                "UTF-8",
-                                                ByteArrayInputStream(ByteArray(0))
-                                            )
-                                        }
+                                    val path = request.url.path?.lowercase() ?: ""
+
+                                    if (currentAdBlockState && adBlockEngine.isAdDomain(host)) {
+                                        return WebResourceResponse(
+                                            "text/plain",
+                                            "UTF-8",
+                                            ByteArrayInputStream(ByteArray(0))
+                                        )
+                                    }
+                                    if (currentDoNotTrackState && adBlockEngine.isTrackerDomain(host)) {
+                                        return WebResourceResponse(
+                                            "text/plain",
+                                            "UTF-8",
+                                            ByteArrayInputStream(ByteArray(0))
+                                        )
+                                    }
+                                    if (currentDoNotTrackState && isKnownTrackerPath(path)) {
+                                        return WebResourceResponse(
+                                            "text/plain",
+                                            "UTF-8",
+                                            ByteArrayInputStream(ByteArray(0))
+                                        )
                                     }
                                 }
                                 return super.shouldInterceptRequest(view, request)
@@ -365,7 +403,7 @@ fun BrowserWebView(
                                 if (request?.isForMainFrame == true) {
                                     val isOffline = !isNetworkAvailable(ctx)
                                     val desc = error?.description?.toString() ?: "Failed to load page"
-                                    onReceivedError(activeTab.id, desc, isOffline)
+                                    onReceivedError(activeTabId, desc, isOffline)
                                 }
                             }
                         }
@@ -376,8 +414,8 @@ fun BrowserWebView(
 
                     // Load URL only if new instance or uninitialized
                     if (isNewInstance || webView.url.isNullOrBlank() || webView.url == "about:blank") {
-                        if (activeTab.url.isNotBlank() && !activeTab.isHome) {
-                            webView.loadUrl(activeTab.url)
+                        if (activeTabUrl.isNotBlank() && !isActiveTabHome) {
+                            webView.loadUrl(activeTabUrl)
                         }
                     }
 
@@ -391,8 +429,8 @@ fun BrowserWebView(
         }
 
         // Error / Offline Overlay
-        if (activeTab.isOffline || activeTab.errorMessage != null) {
-            val isOffline = activeTab.isOffline
+        if (isActiveTabOffline || activeTabErrorMessage != null) {
+            val isOffline = isActiveTabOffline
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -434,7 +472,7 @@ fun BrowserWebView(
                         text = if (isOffline) {
                             "Check your internet connection\nand try again."
                         } else {
-                            "We couldn't load this page.\n${activeTab.errorMessage ?: "Please verify the URL."}"
+                            "We couldn't load this page.\n${activeTabErrorMessage ?: "Please verify the URL."}"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -445,7 +483,7 @@ fun BrowserWebView(
 
                     Button(
                         onClick = {
-                            if (activeTab.url.isNotBlank()) {
+                            if (activeTabUrl.isNotBlank()) {
                                 webViewInstance?.reload()
                             } else {
                                 onRetry()
@@ -479,4 +517,32 @@ private fun isNetworkAvailable(context: Context): Boolean {
     val activeNetwork = connectivityManager.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
     return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+private fun parseColorString(colorStr: String): Int? {
+    return try {
+        if (colorStr.startsWith("#")) {
+            android.graphics.Color.parseColor(colorStr)
+        } else if (colorStr.startsWith("rgb")) {
+            val numbers = colorStr.substringAfter("(").substringBefore(")").split(",")
+            if (numbers.size >= 3) {
+                val r = numbers[0].trim().toIntOrNull() ?: return null
+                val g = numbers[1].trim().toIntOrNull() ?: return null
+                val b = numbers[2].trim().toIntOrNull() ?: return null
+                android.graphics.Color.rgb(r, g, b)
+            } else null
+        } else {
+            android.graphics.Color.parseColor(colorStr)
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun isKnownTrackerPath(path: String): Boolean {
+    return path.contains("/analytics/collect") ||
+        path.contains("/gtag/js") ||
+        path.contains("/pixel.gif") ||
+        path.contains("/track.gif") ||
+        path.contains("/beacon")
 }

@@ -5,6 +5,7 @@ import android.webkit.CookieManager
 import android.webkit.WebStorage
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aryaxzell.aurabrowser.data.adblock.AdBlockEngine
 import com.aryaxzell.aurabrowser.data.db.BookmarkEntity
 import com.aryaxzell.aurabrowser.data.db.BrowserDatabase
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
@@ -80,7 +81,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val history: StateFlow<List<HistoryEntity>> = dao.getAllHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _shortcuts = MutableStateFlow(preferences.getShortcuts())
+    private val _shortcuts = MutableStateFlow<List<ShortcutItem>>(emptyList())
     val shortcuts: StateFlow<List<ShortcutItem>> = _shortcuts.asStateFlow()
 
     private val _urlInput = MutableStateFlow("")
@@ -106,14 +107,18 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val showDownloadsSheet: StateFlow<Boolean> = _showDownloadsSheet.asStateFlow()
 
     val downloadTracker = DownloadTracker(application)
+    val adBlockEngine = AdBlockEngine(application)
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
 
     private var downloadPollingJob: Job? = null
 
     init {
-        // Load downloads asynchronously — tidak boleh memblokir startup UI thread
-        viewModelScope.launch {
+        // Load shortcuts and downloads asynchronously on IO thread to keep cold start UI instant
+        viewModelScope.launch(Dispatchers.IO) {
+            adBlockEngine.loadIfNeeded()
+            val loadedShortcuts = preferences.getShortcuts()
+            _shortcuts.value = loadedShortcuts
             refreshDownloads()
         }
     }
@@ -338,14 +343,18 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         val formattedUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) "https://$url" else url
         val newShortcuts = _shortcuts.value + ShortcutItem(title = title, url = formattedUrl)
         _shortcuts.value = newShortcuts
-        preferences.saveShortcuts(newShortcuts)
         _showAddShortcutDialog.value = false
+        viewModelScope.launch(Dispatchers.IO) {
+            preferences.saveShortcuts(newShortcuts)
+        }
     }
 
     fun removeShortcut(id: String) {
         val newShortcuts = _shortcuts.value.filter { it.id != id }
         _shortcuts.value = newShortcuts
-        preferences.saveShortcuts(newShortcuts)
+        viewModelScope.launch(Dispatchers.IO) {
+            preferences.saveShortcuts(newShortcuts)
+        }
     }
 
     fun updateSearchEngine(engine: SearchEngine) {
@@ -526,7 +535,15 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private var lastProgressUpdateTime = 0L
+    private val PROGRESS_UPDATE_THROTTLE_MS = 80L
+
     fun onProgressChanged(tabId: String, progress: Int) {
+        val now = System.currentTimeMillis()
+        if (progress in 1..99 && now - lastProgressUpdateTime < PROGRESS_UPDATE_THROTTLE_MS) {
+            return
+        }
+        lastProgressUpdateTime = now
         updateTab(tabId) {
             it.copy(
                 progress = progress,
@@ -543,6 +560,12 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                 isOffline = isOffline,
                 errorMessage = description
             )
+        }
+    }
+
+    fun onThemeColorReceived(tabId: String, colorInt: Int?) {
+        updateTab(tabId) {
+            it.copy(themeColor = colorInt)
         }
     }
 
@@ -570,7 +593,9 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                 if (it.id == matchingShortcut.id) it.copy(faviconBase64 = faviconBase64) else it
             }
             _shortcuts.value = updatedShortcuts
-            preferences.saveShortcuts(updatedShortcuts)
+            viewModelScope.launch(Dispatchers.IO) {
+                preferences.saveShortcuts(updatedShortcuts)
+            }
         }
     }
 

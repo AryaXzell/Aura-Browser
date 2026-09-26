@@ -1,6 +1,8 @@
 package com.aryaxzell.aurabrowser.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -74,7 +76,13 @@ import com.aryaxzell.aurabrowser.data.model.TabItem
 
 @Composable
 fun BrowserTopBar(
-    activeTab: TabItem,
+    url: String,
+    isHome: Boolean,
+    isIncognito: Boolean,
+    isDesktopMode: Boolean,
+    isLoading: Boolean,
+    progress: Int,
+    themeColor: Int? = null,
     isEditingUrl: Boolean,
     urlInput: String,
     onUrlInputChange: (String) -> Unit,
@@ -95,211 +103,83 @@ fun BrowserTopBar(
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
-    val isHttps = activeTab.url.startsWith("https://")
+    val isHttps = url.startsWith("https://")
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color.Transparent)
-            .statusBarsPadding()
+    val defaultContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+    val websiteThemeColor = themeColor?.let { Color(it).copy(alpha = 0.88f) }
+    val targetContainerColor = if (!isHome && websiteThemeColor != null) websiteThemeColor else defaultContainerColor
+    val animatedContainerColor by animateColorAsState(
+        targetValue = targetContainerColor,
+        animationSpec = tween(durationMillis = 350),
+        label = "top_bar_theme_color"
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = animatedContainerColor,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+        )
     ) {
-        // Incognito banner indicator
-        if (activeTab.isIncognito) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.inverseSurface)
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = "Incognito Mode Active",
-                    tint = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Incognito Tab • History not saved",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.inverseOnSurface
-                )
-            }
-        }
-
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .statusBarsPadding()
         ) {
-            // Floating Pill Address Bar
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .testTag("address_bar_container")
-                    .clip(CircleShape)
-                    .clickable(enabled = !isEditingUrl) {
-                        onStartEditingUrl()
-                    },
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
-                shape = CircleShape,
-                tonalElevation = 4.dp,
-                shadowElevation = 6.dp,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
-                )
-            ) {
-                Row(
+            // Incognito banner indicator
+            if (isIncognito) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .padding(bottom = 2.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Security or Search icon
-                    if (isEditingUrl) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else if (activeTab.isHome) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search or enter URL",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (isHttps) Icons.Default.Lock else Icons.Default.Search,
-                            contentDescription = if (isHttps) "Secure connection" else "Not secure",
-                            tint = if (isHttps) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    if (isEditingUrl) {
-                        BasicTextField(
-                            value = urlInput,
-                            onValueChange = onUrlInputChange,
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(focusRequester)
-                                .testTag("address_text_field"),
-                            textStyle = TextStyle(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Uri,
-                                imeAction = ImeAction.Go
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onGo = {
-                                    onSubmitUrl(urlInput)
-                                }
-                            ),
-                            decorationBox = { innerTextField ->
-                                Box {
-                                    if (urlInput.isEmpty()) {
-                                        Text(
-                                            text = "Search or type URL",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-
-                        LaunchedEffect(Unit) {
-                            focusRequester.requestFocus()
-                        }
-
-                        if (urlInput.isNotEmpty()) {
-                            IconButton(
-                                onClick = { onUrlInputChange("") },
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .testTag("clear_url_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear input",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        val displayUrl = when {
-                            activeTab.isHome -> "Search or enter URL"
-                            activeTab.url.isNotBlank() -> {
-                                activeTab.url.removePrefix("https://").removePrefix("http://").removePrefix("www.")
-                            }
-                            else -> "Search or enter URL"
-                        }
-
-                        Text(
-                            text = displayUrl,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                            color = if (activeTab.isHome) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        if (!activeTab.isHome) {
-                            if (activeTab.isLoading) {
-                                IconButton(
-                                    onClick = onStop,
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Stop loading",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            } else {
-                                IconButton(
-                                    onClick = onReload,
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Reload page",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = "Incognito Mode Active",
+                                tint = MaterialTheme.colorScheme.inverseOnSurface,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Incognito Tab • History not saved",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.inverseOnSurface
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Action Floating Pill: Cancel when editing, or More Menu when browsing
-            if (isEditingUrl) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Floating Pill Address Bar
                 Surface(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape),
-                    shape = CircleShape,
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("address_bar_container")
+                        .clip(CircleShape)
+                        .clickable(enabled = !isEditingUrl) {
+                            onStartEditingUrl()
+                        },
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                    shape = CircleShape,
                     tonalElevation = 4.dp,
                     shadowElevation = 6.dp,
                     border = BorderStroke(
@@ -307,57 +187,220 @@ fun BrowserTopBar(
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                     )
                 ) {
-                    IconButton(
-                        onClick = onCancelEditingUrl,
+                    Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .testTag("cancel_edit_url_button")
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Cancel URL edit",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                        // Security or Search icon
+                        if (isEditingUrl) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else if (isHome) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search or enter URL",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (isHttps) Icons.Default.Lock else Icons.Default.Search,
+                                contentDescription = if (isHttps) "Secure connection" else "Not secure",
+                                tint = if (isHttps) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        if (isEditingUrl) {
+                            BasicTextField(
+                                value = urlInput,
+                                onValueChange = onUrlInputChange,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(focusRequester)
+                                    .testTag("address_text_field"),
+                                textStyle = TextStyle(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Normal
+                                ),
+                                singleLine = true,
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Uri,
+                                    imeAction = ImeAction.Go
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onGo = {
+                                        onSubmitUrl(urlInput)
+                                    }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Box {
+                                        if (urlInput.isEmpty()) {
+                                            Text(
+                                                text = "Search or type URL",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+
+                            LaunchedEffect(Unit) {
+                                focusRequester.requestFocus()
+                            }
+
+                            if (urlInput.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { onUrlInputChange("") },
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .testTag("clear_url_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear input",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            val displayUrl = when {
+                                isHome -> "Search or enter URL"
+                                url.isNotBlank() -> {
+                                    url.removePrefix("https://").removePrefix("http://").removePrefix("www.")
+                                }
+                                else -> "Search or enter URL"
+                            }
+
+                            Text(
+                                text = displayUrl,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = if (isHome) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            if (!isHome) {
+                                if (isLoading) {
+                                    IconButton(
+                                        onClick = onStop,
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Stop loading",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else {
+                                    IconButton(
+                                        onClick = onReload,
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Reload page",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            } else {
-                TopBarMenu(
-                    activeTab = activeTab,
-                    isBookmarked = isBookmarked,
-                    onReload = onReload,
-                    onToggleBookmark = onToggleBookmark,
-                    onToggleDesktop = onToggleDesktop,
-                    onOpenBookmarks = onOpenBookmarks,
-                    onOpenHistory = onOpenHistory,
-                    onOpenDownloads = onOpenDownloads,
-                    onOpenSettings = onOpenSettings,
-                    onOpenNewTab = onOpenNewTab,
-                    onShareUrl = onShareUrl
-                )
-            }
-        }
 
-        // Progress bar right below address bar
-        AnimatedVisibility(
-            visible = activeTab.isLoading && activeTab.progress in 1..99,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            LinearProgressIndicator(
-                progress = { activeTab.progress / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Action Floating Pill: Cancel when editing, or More Menu when browsing
+                if (isEditingUrl) {
+                    Surface(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                        tonalElevation = 4.dp,
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+                        )
+                    ) {
+                        IconButton(
+                            onClick = onCancelEditingUrl,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("cancel_edit_url_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel URL edit",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                } else {
+                    TopBarMenu(
+                        isHome = isHome,
+                        isDesktopMode = isDesktopMode,
+                        isBookmarked = isBookmarked,
+                        onReload = onReload,
+                        onToggleBookmark = onToggleBookmark,
+                        onToggleDesktop = onToggleDesktop,
+                        onOpenBookmarks = onOpenBookmarks,
+                        onOpenHistory = onOpenHistory,
+                        onOpenDownloads = onOpenDownloads,
+                        onOpenSettings = onOpenSettings,
+                        onOpenNewTab = onOpenNewTab,
+                        onShareUrl = onShareUrl
+                    )
+                }
+            }
+
+            // Progress bar in isolated composable
+            ProgressIndicatorBar(isLoading = isLoading, progress = progress)
         }
     }
 }
 
 @Composable
+private fun ProgressIndicatorBar(isLoading: Boolean, progress: Int) {
+    AnimatedVisibility(
+        visible = isLoading && progress in 1..99,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        LinearProgressIndicator(
+            progress = { progress / 100f },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.5.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun TopBarMenu(
-    activeTab: TabItem,
+    isHome: Boolean,
+    isDesktopMode: Boolean,
     isBookmarked: Boolean,
     onReload: () -> Unit,
     onToggleBookmark: () -> Unit,
@@ -399,22 +442,26 @@ private fun TopBarMenu(
             }
         }
 
-        // iOS-style contextual dropdown menu
+        // Proportional, smooth contextual dropdown menu
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            offset = DpOffset(x = 0.dp, y = 6.dp),
-            shape = RoundedCornerShape(18.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp,
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            offset = DpOffset(x = (-4).dp, y = 6.dp),
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f),
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)),
             modifier = Modifier
-                .width(240.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .width(210.dp)
+                .clip(RoundedCornerShape(16.dp))
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (!activeTab.isHome) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                if (!isHome) {
                     IOSMenuItem(
                         text = if (isBookmarked) "Remove Bookmark" else "Add Bookmark",
                         icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -425,7 +472,7 @@ private fun TopBarMenu(
                         }
                     )
                     IOSMenuItem(
-                        text = if (activeTab.isDesktopMode) "Mobile Website" else "Desktop Website",
+                        text = if (isDesktopMode) "Mobile Website" else "Desktop Website",
                         icon = Icons.Default.Laptop,
                         onClick = {
                             expanded = false
@@ -450,7 +497,7 @@ private fun TopBarMenu(
                     )
 
                     HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                     )
@@ -475,7 +522,7 @@ private fun TopBarMenu(
                 )
 
                 HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                 )
@@ -508,7 +555,7 @@ private fun TopBarMenu(
                 )
 
                 HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                 )
@@ -537,16 +584,16 @@ private fun IOSMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(40.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Normal
             ),
             color = textColor,
@@ -557,7 +604,7 @@ private fun IOSMenuItem(
             imageVector = icon,
             contentDescription = null,
             tint = iconTint,
-            modifier = Modifier.size(19.dp)
+            modifier = Modifier.size(18.dp)
         )
     }
 }

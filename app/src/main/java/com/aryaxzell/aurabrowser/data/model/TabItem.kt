@@ -30,7 +30,8 @@ data class TabItem(
     val isLoading: Boolean = false,
     val progress: Int = 0,
     val isOffline: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val themeColor: Int? = null
 )
 
 data class ShortcutItem(

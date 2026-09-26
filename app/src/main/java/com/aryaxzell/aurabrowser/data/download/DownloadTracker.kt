@@ -12,11 +12,25 @@ import java.util.Locale
 class DownloadTracker(private val context: Context) {
     private val downloadManager: DownloadManager? =
         context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+    private val ownedIdsPrefs = context.getSharedPreferences("aura_owned_downloads", Context.MODE_PRIVATE)
+
+    fun registerOwnedDownload(id: Long) {
+        val current = ownedIdsPrefs.getStringSet("ids", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        ownedIdsPrefs.edit().putStringSet("ids", current).apply()
+    }
 
     fun getDownloads(): List<DownloadItem> {
         val dm = downloadManager ?: return emptyList()
+        val ownedIds = ownedIdsPrefs.getStringSet("ids", emptySet())
+            ?.mapNotNull { it.toLongOrNull() }
+            ?.toLongArray()
+            ?: return emptyList()
+
+        if (ownedIds.isEmpty()) return emptyList()
+
         val list = mutableListOf<DownloadItem>()
-        val query = DownloadManager.Query()
+        val query = DownloadManager.Query().setFilterById(*ownedIds)
         val cursor = try {
             dm.query(query)
         } catch (e: Exception) {
@@ -79,6 +93,9 @@ class DownloadTracker(private val context: Context) {
             downloadManager?.remove(id)
         } catch (_: Exception) {
         }
+        val current = ownedIdsPrefs.getStringSet("ids", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.remove(id.toString())
+        ownedIdsPrefs.edit().putStringSet("ids", current).apply()
     }
 
     companion object {

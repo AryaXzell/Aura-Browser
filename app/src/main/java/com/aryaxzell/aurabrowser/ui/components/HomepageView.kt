@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,18 +22,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,13 +43,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,6 +73,8 @@ import com.aryaxzell.aurabrowser.data.db.BookmarkEntity
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
 import com.aryaxzell.aurabrowser.data.model.ShortcutItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Composable
@@ -78,6 +94,7 @@ fun HomepageView(
     onAddShortcutClick: () -> Unit,
     onHistoryItemClick: (String) -> Unit,
     onBookmarkItemClick: (String) -> Unit,
+    onDeleteHistoryItem: (HistoryEntity) -> Unit,
     onOpenDownloads: () -> Unit = {},
     onOpenBookmarks: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
@@ -86,52 +103,59 @@ fun HomepageView(
     val context = LocalContext.current
     val greeting = rememberGreeting()
 
-    val customIconBitmap = remember(homeIconUri) {
-        homeIconUri?.let { path ->
-            try {
-                BitmapFactory.decodeFile(path)?.asImageBitmap()
-            } catch (e: Exception) {
-                null
+    val customIconBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = homeIconUri) {
+        value = withContext(Dispatchers.IO) {
+            homeIconUri?.let { path ->
+                try {
+                    BitmapFactory.decodeFile(path)?.asImageBitmap()
+                } catch (e: Exception) {
+                    null
+                }
             }
         }
     }
 
-    // Load and cache background wallpaper
-    val wallpaperBitmap = remember(wallpaperUri, isWallpaperBlurEnabled) {
-        if (wallpaperUri.isNullOrBlank()) null
-        else {
-            try {
-                val uri = Uri.parse(wallpaperUri)
-                var bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                        val targetWidth = 1080.coerceAtMost(info.size.width)
-                        val targetHeight = (targetWidth.toFloat() * info.size.height / info.size.width).toInt()
-                        decoder.setTargetSize(targetWidth, targetHeight)
-                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+    // Load and cache background wallpaper off the main thread for fast cold start
+    val wallpaperBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = wallpaperUri, key2 = isWallpaperBlurEnabled) {
+        value = withContext(Dispatchers.IO) {
+            if (wallpaperUri.isNullOrBlank()) null
+            else {
+                try {
+                    val uri = Uri.parse(wallpaperUri)
+                    var bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                            val targetWidth = 1080.coerceAtMost(info.size.width)
+                            val targetHeight = (targetWidth.toFloat() * info.size.height / info.size.width).toInt()
+                            decoder.setTargetSize(targetWidth, targetHeight)
+                            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                        }
+                    } else {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                            BitmapFactory.decodeStream(stream, null, options)
+                        }
                     }
-                } else {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-                        BitmapFactory.decodeStream(stream, null, options)
-                    }
-                }
 
-                if (bitmap != null && isWallpaperBlurEnabled) {
-                    bitmap = applyStaticBlur(bitmap, context)
+                    if (bitmap != null && isWallpaperBlurEnabled) {
+                        bitmap = applyStaticBlur(bitmap, context)
+                    }
+                    bitmap?.asImageBitmap()
+                } catch (e: Exception) {
+                    null
                 }
-                bitmap?.asImageBitmap()
-            } catch (e: Exception) {
-                null
             }
         }
     }
+
+    val currentWallpaper = wallpaperBitmap
+    val currentCustomIcon = customIconBitmap
 
     Box(modifier = modifier.fillMaxSize()) {
         // Wallpaper Layer or Default Background
-        if (wallpaperBitmap != null) {
+        if (currentWallpaper != null) {
             Image(
-                bitmap = wallpaperBitmap,
+                bitmap = currentWallpaper,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -154,32 +178,36 @@ fun HomepageView(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Minimalist Aura Logo
+        // Minimalist Vector Aura Logo Icon
         Box(
             modifier = Modifier
                 .size(68.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (customIconBitmap != null) {
+            if (currentCustomIcon != null) {
                 Image(
-                    bitmap = customIconBitmap,
+                    bitmap = currentCustomIcon,
                     contentDescription = "Home Icon",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Default.Language,
-                    contentDescription = "Aura Browser",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(36.dp)
+                AuraVectorLogo(
+                    modifier = Modifier.size(38.dp)
                 )
             }
         }
@@ -436,7 +464,7 @@ fun HomepageView(
             Spacer(modifier = Modifier.height(28.dp))
         }
 
-        if (showRecentHistory && recentHistory.isNotEmpty()) {
+        if (showRecentHistory) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -457,59 +485,128 @@ fun HomepageView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                recentHistory.take(4).forEach { item ->
-                    Surface(
+            if (recentHistory.isEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(10.dp),
+                    tonalElevation = 1.dp
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { onHistoryItemClick(item.url) },
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(10.dp),
-                        tonalElevation = 1.dp
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = item.title.take(1).uppercase().ifBlank { "W" },
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Your browsing history will appear here",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = false
+                ) {
+                    items(
+                        items = recentHistory.take(4),
+                        key = { it.id }
+                    ) { item ->
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
+                                    onDeleteHistoryItem(item)
+                                    true
+                                } else {
+                                    false
+                                }
                             }
+                        )
 
-                            Spacer(modifier = Modifier.width(12.dp))
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.errorContainer)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = when (dismissState.dismissDirection) {
+                                        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                        else -> Alignment.CenterEnd
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onHistoryItemClick(item.url) },
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(10.dp),
+                                tonalElevation = 1.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = item.title.take(1).uppercase().ifBlank { "W" },
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
 
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.title,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = item.url,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.title,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = item.url,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -517,7 +614,7 @@ fun HomepageView(
             }
         }
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -622,5 +719,59 @@ private fun rememberGreeting(): String {
         in 12..16 -> "Good afternoon"
         in 17..20 -> "Good evening"
         else -> "Good night"
+    }
+}
+
+@Composable
+fun AuraVectorLogo(modifier: Modifier = Modifier) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        val radius = minOf(w, h) / 2.2f
+
+        // Glowing outer aura ring
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(primaryColor.copy(alpha = 0.35f), Color.Transparent),
+                center = center,
+                radius = radius * 1.3f
+            ),
+            radius = radius * 1.3f,
+            center = center
+        )
+
+        // Outer orbit circle
+        drawCircle(
+            color = primaryColor,
+            radius = radius * 0.85f,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Tilted orbit ring (Browser Aura theme)
+        drawOval(
+            color = tertiaryColor,
+            topLeft = Offset(center.x - radius * 0.95f, center.y - radius * 0.45f),
+            size = Size(radius * 1.9f, radius * 0.9f),
+            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Center core browser globe/dot
+        drawCircle(
+            color = onContainer,
+            radius = radius * 0.32f,
+            center = center
+        )
+
+        // Sparkle accent
+        drawCircle(
+            color = primaryColor,
+            radius = radius * 0.12f,
+            center = Offset(center.x + radius * 0.45f, center.y - radius * 0.45f)
+        )
     }
 }

@@ -1,5 +1,5 @@
 package com.aryaxzell.aurabrowser.ui.theme
-
+ 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -12,7 +12,23 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+ 
+/**
+ * Memilih warna teks/ikon ("on-color") yang kontras terbaik terhadap sebuah warna latar,
+ * dengan mempertimbangkan luminance aktual warna tersebut alih-alih asumsi statis.
+ * Ini menjamin keterbacaan konsisten di SELURUH 6 varian accent color, termasuk kombinasi
+ * yang secara warna cukup terang/gelap ekstrem seperti Amber Gold atau Electric Cyan.
+ */
+private fun contrastingOnColor(backgroundColor: Color, darkTheme: Boolean): Color {
+    val luminance = backgroundColor.luminance()
+    return if (luminance > 0.5f) {
+        AuraTextPrimaryLight
+    } else {
+        if (darkTheme) AuraTextPrimaryDark else Color.White
+    }
+}
 
 fun getAuraColorScheme(darkTheme: Boolean, accentKey: String): ColorScheme {
     val (primaryColor, secondaryColor) = when (accentKey) {
@@ -23,42 +39,75 @@ fun getAuraColorScheme(darkTheme: Boolean, accentKey: String): ColorScheme {
         "cyan" -> if (darkTheme) Pair(AccentElectricCyanDark, Color(0xFF0891B2)) else Pair(AccentElectricCyan, Color(0xFF06B6D4))
         else -> if (darkTheme) Pair(AuraCyanDark, AuraSecondaryDark) else Pair(AuraCyanLight, AuraSecondaryLight)
     }
+ 
+    val onPrimaryColor = contrastingOnColor(primaryColor, darkTheme)
+    val onSecondaryColor = contrastingOnColor(secondaryColor, darkTheme)
 
     return if (darkTheme) {
         darkColorScheme(
             primary = primaryColor,
-            secondary = secondaryColor,
-            background = AuraBgDark,
-            surface = AuraSurfaceDark,
-            surfaceVariant = AuraSurfaceVariantDark,
+            onPrimary = onPrimaryColor,
             primaryContainer = primaryColor.copy(alpha = 0.2f),
             onPrimaryContainer = primaryColor,
-            onPrimary = AuraBgDark,
-            onSecondary = AuraBgDark,
+            secondary = secondaryColor,
+            onSecondary = onSecondaryColor,
+            secondaryContainer = AuraSecondaryContainerDark,
+            onSecondaryContainer = AuraOnSecondaryContainerDark,
+            tertiary = AuraTertiaryDark,
+            onTertiary = AuraOnTertiaryDark,
+            tertiaryContainer = AuraTertiaryContainerDark,
+            onTertiaryContainer = AuraOnTertiaryContainerDark,
+            background = AuraBgDark,
             onBackground = AuraTextPrimaryDark,
+            surface = AuraSurfaceDark,
             onSurface = AuraTextPrimaryDark,
+            surfaceVariant = AuraSurfaceVariantDark,
             onSurfaceVariant = AuraTextSecondaryDark,
-            outline = AuraBorderDark
+            outline = AuraBorderDark,
+            outlineVariant = AuraOutlineVariantDark,
+            error = AuraErrorDark,
+            onError = AuraOnErrorDark,
+            errorContainer = AuraErrorContainerDark,
+            onErrorContainer = AuraOnErrorContainerDark,
+            inverseSurface = AuraInverseSurfaceDark,
+            inverseOnSurface = AuraInverseOnSurfaceDark,
+            inversePrimary = AuraInversePrimaryDark,
+            scrim = AuraScrim
         )
     } else {
         lightColorScheme(
             primary = primaryColor,
-            secondary = secondaryColor,
-            background = AuraBgLight,
-            surface = AuraSurfaceLight,
-            surfaceVariant = AuraSurfaceVariantLight,
+            onPrimary = onPrimaryColor,
             primaryContainer = primaryColor.copy(alpha = 0.12f),
             onPrimaryContainer = primaryColor,
-            onPrimary = AuraSurfaceLight,
-            onSecondary = AuraSurfaceLight,
+            secondary = secondaryColor,
+            onSecondary = onSecondaryColor,
+            secondaryContainer = AuraSecondaryContainerLight,
+            onSecondaryContainer = AuraOnSecondaryContainerLight,
+            tertiary = AuraTertiaryLight,
+            onTertiary = AuraOnTertiaryLight,
+            tertiaryContainer = AuraTertiaryContainerLight,
+            onTertiaryContainer = AuraOnTertiaryContainerLight,
+            background = AuraBgLight,
             onBackground = AuraTextPrimaryLight,
+            surface = AuraSurfaceLight,
             onSurface = AuraTextPrimaryLight,
+            surfaceVariant = AuraSurfaceVariantLight,
             onSurfaceVariant = AuraTextSecondaryLight,
-            outline = AuraBorderLight
+            outline = AuraBorderLight,
+            outlineVariant = AuraOutlineVariantLight,
+            error = AuraErrorLight,
+            onError = AuraOnErrorLight,
+            errorContainer = AuraErrorContainerLight,
+            onErrorContainer = AuraOnErrorContainerLight,
+            inverseSurface = AuraInverseSurfaceLight,
+            inverseOnSurface = AuraInverseOnSurfaceLight,
+            inversePrimary = AuraInversePrimaryLight,
+            scrim = AuraScrim
         )
     }
 }
-
+ 
 @Composable
 private fun animatedColorScheme(target: ColorScheme): ColorScheme {
     val animSpec = tween<Color>(durationMillis = 350)
@@ -73,6 +122,8 @@ private fun animatedColorScheme(target: ColorScheme): ColorScheme {
         onSecondaryContainer = animateColorAsState(target.onSecondaryContainer, animSpec, label = "onSecondaryContainer").value,
         tertiary = animateColorAsState(target.tertiary, animSpec, label = "tertiary").value,
         onTertiary = animateColorAsState(target.onTertiary, animSpec, label = "onTertiary").value,
+        tertiaryContainer = animateColorAsState(target.tertiaryContainer, animSpec, label = "tertiaryContainer").value,
+        onTertiaryContainer = animateColorAsState(target.onTertiaryContainer, animSpec, label = "onTertiaryContainer").value,
         background = animateColorAsState(target.background, animSpec, label = "background").value,
         onBackground = animateColorAsState(target.onBackground, animSpec, label = "onBackground").value,
         surface = animateColorAsState(target.surface, animSpec, label = "surface").value,
@@ -80,8 +131,15 @@ private fun animatedColorScheme(target: ColorScheme): ColorScheme {
         surfaceVariant = animateColorAsState(target.surfaceVariant, animSpec, label = "surfaceVariant").value,
         onSurfaceVariant = animateColorAsState(target.onSurfaceVariant, animSpec, label = "onSurfaceVariant").value,
         outline = animateColorAsState(target.outline, animSpec, label = "outline").value,
+        outlineVariant = animateColorAsState(target.outlineVariant, animSpec, label = "outlineVariant").value,
         error = animateColorAsState(target.error, animSpec, label = "error").value,
-        onError = animateColorAsState(target.onError, animSpec, label = "onError").value
+        onError = animateColorAsState(target.onError, animSpec, label = "onError").value,
+        errorContainer = animateColorAsState(target.errorContainer, animSpec, label = "errorContainer").value,
+        onErrorContainer = animateColorAsState(target.onErrorContainer, animSpec, label = "onErrorContainer").value,
+        inverseSurface = animateColorAsState(target.inverseSurface, animSpec, label = "inverseSurface").value,
+        inverseOnSurface = animateColorAsState(target.inverseOnSurface, animSpec, label = "inverseOnSurface").value,
+        inversePrimary = animateColorAsState(target.inversePrimary, animSpec, label = "inversePrimary").value,
+        scrim = animateColorAsState(target.scrim, animSpec, label = "scrim").value
     )
 }
 

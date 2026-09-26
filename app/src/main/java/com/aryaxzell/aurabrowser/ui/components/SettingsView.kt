@@ -64,6 +64,12 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wallpaper
 import java.io.File
 import java.io.FileOutputStream
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -73,14 +79,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -137,129 +142,148 @@ fun SettingsView(
     onClearBrowsingData: (clearCache: Boolean, clearHistory: Boolean, clearCookies: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNameEditDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
 
     val tabs = listOf("General", "Appearance", "Privacy", "Browser")
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+        var visible by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { visible = true }
+
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(200)) + slideInVertically(
+                initialOffsetY = { it / 10 },
+                animationSpec = tween(200)
+            ),
+            exit = fadeOut(animationSpec = tween(150))
         ) {
-            // iOS Modal Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
             ) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                IconButton(
-                    onClick = onDismiss,
+                Column(
                     modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            shape = CircleShape
-                        )
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // iOS Segmented Control
-            IOSSegmentedControl(
-                tabs = tabs,
-                selectedIndex = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Tab content with iOS grouped cards
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-            ) {
-                AnimatedContent(
-                    targetState = selectedTab,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
-                    },
-                    label = "settings_tab_transition"
-                ) { currentTab ->
-                    Column(
+                    // iOS Modal Header
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(bottom = 24.dp)
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        when (currentTab) {
-                            0 -> GeneralTabContent(
-                                currentSearchEngine = currentSearchEngine,
-                                onSelectSearchEngine = onSelectSearchEngine,
-                                userName = userName,
-                                onOpenEditName = { showNameEditDialog = true }
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close settings",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
                             )
-                            1 -> AppearanceTabContent(
-                                themeMode = themeMode,
-                                onSelectThemeMode = onSelectThemeMode,
-                                accentColor = accentColor,
-                                onSelectAccentColor = onSelectAccentColor,
-                                tabSwitcherLayout = tabSwitcherLayout,
-                                onSelectTabSwitcherLayout = onSelectTabSwitcherLayout,
-                                bottomBarItems = bottomBarItems,
-                                onUpdateBottomBarItems = onUpdateBottomBarItems,
-                                wallpaperUri = wallpaperUri,
-                                isWallpaperBlurEnabled = isWallpaperBlurEnabled,
-                                onUpdateWallpaperUri = onUpdateWallpaperUri,
-                                onUpdateWallpaperBlur = onUpdateWallpaperBlur,
-                                homeIconUri = homeIconUri,
-                                onUpdateHomeIconUri = onUpdateHomeIconUri,
-                                showShortcuts = showShortcuts,
-                                onToggleShowShortcuts = onToggleShowShortcuts,
-                                showRecentHistory = showRecentHistory,
-                                onToggleShowRecentHistory = onToggleShowRecentHistory
-                            )
-                            2 -> PrivacyTabContent(
-                                isAdBlockEnabled = isAdBlockEnabled,
-                                onToggleAdBlock = onToggleAdBlock,
-                                isDoNotTrack = isDoNotTrack,
-                                onToggleDoNotTrack = onToggleDoNotTrack,
-                                onOpenClearData = { showClearDataDialog = true }
-                            )
-                            3 -> BrowserTabContent(
-                                isDesktopModeDefault = isDesktopModeDefault,
-                                onToggleDesktopDefault = onToggleDesktopDefault,
-                                isJavaScriptEnabled = isJavaScriptEnabled,
-                                onToggleJavaScript = onToggleJavaScript
-                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // iOS Segmented Control
+                    IOSSegmentedControl(
+                        tabs = tabs,
+                        selectedIndex = selectedTab,
+                        onTabSelected = { selectedTab = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Tab content with iOS grouped cards
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
+                            },
+                            label = "settings_tab_transition"
+                        ) { currentTab ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(bottom = 24.dp)
+                            ) {
+                                when (currentTab) {
+                                    0 -> GeneralTabContent(
+                                        currentSearchEngine = currentSearchEngine,
+                                        onSelectSearchEngine = onSelectSearchEngine,
+                                        userName = userName,
+                                        onOpenEditName = { showNameEditDialog = true }
+                                    )
+                                    1 -> AppearanceTabContent(
+                                        themeMode = themeMode,
+                                        onSelectThemeMode = onSelectThemeMode,
+                                        accentColor = accentColor,
+                                        onSelectAccentColor = onSelectAccentColor,
+                                        tabSwitcherLayout = tabSwitcherLayout,
+                                        onSelectTabSwitcherLayout = onSelectTabSwitcherLayout,
+                                        bottomBarItems = bottomBarItems,
+                                        onUpdateBottomBarItems = onUpdateBottomBarItems,
+                                        wallpaperUri = wallpaperUri,
+                                        isWallpaperBlurEnabled = isWallpaperBlurEnabled,
+                                        onUpdateWallpaperUri = onUpdateWallpaperUri,
+                                        onUpdateWallpaperBlur = onUpdateWallpaperBlur,
+                                        homeIconUri = homeIconUri,
+                                        onUpdateHomeIconUri = onUpdateHomeIconUri,
+                                        showShortcuts = showShortcuts,
+                                        onToggleShowShortcuts = onToggleShowShortcuts,
+                                        showRecentHistory = showRecentHistory,
+                                        onToggleShowRecentHistory = onToggleShowRecentHistory
+                                    )
+                                    2 -> PrivacyTabContent(
+                                        isAdBlockEnabled = isAdBlockEnabled,
+                                        onToggleAdBlock = onToggleAdBlock,
+                                        isDoNotTrack = isDoNotTrack,
+                                        onToggleDoNotTrack = onToggleDoNotTrack,
+                                        onOpenClearData = { showClearDataDialog = true }
+                                    )
+                                    3 -> BrowserTabContent(
+                                        isDesktopModeDefault = isDesktopModeDefault,
+                                        onToggleDesktopDefault = onToggleDesktopDefault,
+                                        isJavaScriptEnabled = isJavaScriptEnabled,
+                                        onToggleJavaScript = onToggleJavaScript
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -304,15 +328,23 @@ fun SettingsView(
 
     // Clear Data Dialog
     if (showClearDataDialog) {
+        val context = LocalContext.current
         var clearHistory by remember { mutableStateOf(true) }
         var clearCache by remember { mutableStateOf(true) }
         var clearCookies by remember { mutableStateOf(false) }
+        val sizeInfo = remember(showClearDataDialog) { calculateBrowsingDataSize(context) }
 
         AlertDialog(
             onDismissRequest = { showClearDataDialog = false },
             title = { Text("Clear Browsing Data") },
             text = {
                 Column {
+                    Text(
+                        text = "Total stored data: ${sizeInfo.totalSizeStr}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -331,8 +363,16 @@ fun SettingsView(
                     ) {
                         Checkbox(checked = clearCache, onCheckedChange = { clearCache = it })
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cached web content")
+                        Column {
+                            Text("Cached web content")
+                            Text(
+                                text = "Size: ${sizeInfo.cacheSizeStr}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -446,6 +486,9 @@ private fun PrivacyTabContent(
     onToggleDoNotTrack: (Boolean) -> Unit,
     onOpenClearData: () -> Unit
 ) {
+    val context = LocalContext.current
+    var dataSizeInfo by remember { mutableStateOf(calculateBrowsingDataSize(context)) }
+
     // Card 1: Content Blocking & Protection
     IOSCardGroup(
         header = "CONTENT & PRIVACY PROTECTION",
@@ -491,17 +534,34 @@ private fun PrivacyTabContent(
             icon = Icons.Default.DeleteOutline,
             iconBgColor = Color(0xFFFF3B30), // iOS System Red
             title = "Clear Browsing Data",
-            subtitle = "History, cache, and site cookies",
+            subtitle = "Stored: ${dataSizeInfo.totalSizeStr} (History, Cache & Cookies)",
             titleColor = MaterialTheme.colorScheme.error,
             trailingContent = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = dataSizeInfo.totalSizeStr,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             },
-            onClick = onOpenClearData
+            onClick = {
+                dataSizeInfo = calculateBrowsingDataSize(context)
+                onOpenClearData()
+            }
         )
     }
 }
@@ -1039,7 +1099,7 @@ private fun IOSCardGroup(
             Text(
                 text = footer,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.padding(start = 14.dp, top = 6.dp, end = 14.dp)
             )
         }
@@ -1164,4 +1224,67 @@ private fun saveCroppedIconToInternalStorage(context: android.content.Context, b
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
     }
     return file.absolutePath
+}
+
+private data class BrowsingDataSizeInfo(
+    val cacheSizeStr: String,
+    val totalSizeStr: String,
+    val totalSizeBytes: Long
+)
+
+private fun calculateBrowsingDataSize(context: android.content.Context): BrowsingDataSizeInfo {
+    var cacheBytes = 0L
+    var totalBytes = 0L
+
+    try {
+        val cDirSize = getFolderSize(context.cacheDir)
+        cacheBytes += cDirSize
+        totalBytes += cDirSize
+    } catch (_: Exception) {}
+
+    try {
+        val ccDirSize = getFolderSize(context.codeCacheDir)
+        cacheBytes += ccDirSize
+        totalBytes += ccDirSize
+    } catch (_: Exception) {}
+
+    try {
+        val webViewDir = File(context.applicationInfo.dataDir, "app_webview")
+        if (webViewDir.exists()) {
+            totalBytes += getFolderSize(webViewDir)
+        }
+    } catch (_: Exception) {}
+
+    try {
+        context.databaseList().forEach { dbName ->
+            val dbFile = context.getDatabasePath(dbName)
+            if (dbFile.exists()) {
+                totalBytes += dbFile.length()
+            }
+        }
+    } catch (_: Exception) {}
+
+    return BrowsingDataSizeInfo(
+        cacheSizeStr = formatBytes(cacheBytes),
+        totalSizeStr = formatBytes(totalBytes),
+        totalSizeBytes = totalBytes
+    )
+}
+
+private fun getFolderSize(folder: File?): Long {
+    if (folder == null || !folder.exists()) return 0L
+    var length = 0L
+    val files = folder.listFiles() ?: return 0L
+    for (file in files) {
+        length += if (file.isDirectory) getFolderSize(file) else file.length()
+    }
+    return length
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0.0 KB"
+    val units = arrayOf("B", "KB", "MB", "GB")
+    val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+    val value = bytes / Math.pow(1024.0, digitGroups.toDouble())
+    return String.format(java.util.Locale.US, "%.1f %s", value, units[digitGroups])
 }

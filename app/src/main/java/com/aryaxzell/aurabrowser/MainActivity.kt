@@ -26,7 +26,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -89,10 +91,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
         // Handle external VIEW intent (e.g. clicked link from another app)
         handleIntent(intent)
 
@@ -110,6 +108,10 @@ class MainActivity : ComponentActivity() {
                 val insetsController = WindowInsetsControllerCompat(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = !isDarkTheme
                 insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
 
             MyApplicationTheme(
@@ -181,12 +183,22 @@ fun BrowserApp(
     val webAction by viewModel.webAction.collectAsStateWithLifecycle()
     val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
+    val isBookmarked = remember(activeTab.url, bookmarks) {
+        activeTab.url.isNotBlank() && bookmarks.any { it.url == activeTab.url }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             BrowserTopBar(
-                activeTab = activeTab,
+                url = activeTab.url,
+                isHome = activeTab.isHome,
+                isIncognito = activeTab.isIncognito,
+                isDesktopMode = activeTab.isDesktopMode,
+                isLoading = activeTab.isLoading,
+                progress = activeTab.progress,
+                themeColor = activeTab.themeColor,
                 isEditingUrl = isEditingUrl,
                 urlInput = urlInput,
                 onUrlInputChange = { viewModel.updateUrlInput(it) },
@@ -196,7 +208,7 @@ fun BrowserApp(
                 onReload = { viewModel.reload() },
                 onStop = { viewModel.stop() },
                 onToggleBookmark = { viewModel.toggleBookmarkCurrentTab() },
-                isBookmarked = bookmarks.any { it.url == activeTab.url && activeTab.url.isNotBlank() },
+                isBookmarked = isBookmarked,
                 onToggleDesktop = { viewModel.toggleDesktopMode() },
                 onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
                 onOpenHistory = { viewModel.setHistorySheetVisible(true) },
@@ -222,6 +234,7 @@ fun BrowserApp(
                 canGoForward = activeTab.canGoForward,
                 tabCount = tabs.size,
                 isHome = activeTab.isHome,
+                themeColor = activeTab.themeColor,
                 onBack = { viewModel.goBack() },
                 onForward = { viewModel.goForward() },
                 onNewTab = { viewModel.createNewTab() },
@@ -244,7 +257,8 @@ fun BrowserApp(
                     (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)))
                         .togetherWith(fadeOut(animationSpec = tween(150)))
                 },
-                label = "tab_switch_transition"
+                label = "tab_switch_transition",
+                modifier = Modifier.fillMaxSize()
             ) { targetTabId ->
                 val tabToRender = tabs.find { it.id == targetTabId } ?: activeTab
                 if (tabToRender.isHome) {
@@ -264,6 +278,7 @@ fun BrowserApp(
                         onAddShortcutClick = { viewModel.setAddShortcutDialogVisible(true) },
                         onHistoryItemClick = { url -> viewModel.loadUrl(url) },
                         onBookmarkItemClick = { url -> viewModel.loadUrl(url) },
+                        onDeleteHistoryItem = { item -> viewModel.deleteHistoryItem(item) },
                         onOpenDownloads = { viewModel.setDownloadsSheetVisible(true) },
                         onOpenBookmarks = { viewModel.setBookmarksSheetVisible(true) },
                         onOpenHistory = { viewModel.setHistorySheetVisible(true) }
@@ -276,8 +291,17 @@ fun BrowserApp(
                     )
                 } else {
                     BrowserWebView(
-                        activeTab = tabToRender,
+                        activeTabId = tabToRender.id,
+                        activeTabUrl = tabToRender.url,
+                        isActiveTabHome = tabToRender.isHome,
+                        isActiveTabIncognito = tabToRender.isIncognito,
+                        isActiveTabDesktopMode = tabToRender.isDesktopMode,
+                        isActiveTabOffline = tabToRender.isOffline,
+                        activeTabErrorMessage = tabToRender.errorMessage,
+                        isActiveTabLoading = tabToRender.isLoading,
                         webViewPoolManager = viewModel.webViewPoolManager,
+                        adBlockEngine = viewModel.adBlockEngine,
+                        downloadTracker = viewModel.downloadTracker,
                         isAdBlockEnabled = isAdBlockEnabled,
                         isJavaScriptEnabled = isJavaScriptEnabled,
                         isDoNotTrack = isDoNotTrackEnabled,
@@ -290,6 +314,7 @@ fun BrowserApp(
                         onProgressChanged = { tabId, progress -> viewModel.onProgressChanged(tabId, progress) },
                         onReceivedError = { tabId, desc, isOffline -> viewModel.onReceivedError(tabId, desc, isOffline) },
                         onFaviconReceived = { tabId, favicon -> viewModel.onFaviconReceived(tabId, favicon) },
+                        onThemeColorReceived = { tabId, color -> viewModel.onThemeColorReceived(tabId, color) },
                         onShowFileChooser = onShowFileChooser,
                         onRetry = { viewModel.goHome() }
                     )

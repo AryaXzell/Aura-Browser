@@ -44,3 +44,46 @@ val AccentAmberGoldDark = Color(0xFFFBBF24)
 val AccentElectricCyan = Color(0xFF0891B2)
 val AccentElectricCyanDark = Color(0xFF22D3EE)
 
+// Tambahan untuk melengkapi field ColorScheme yang sebelumnya kosong
+
+// Error colors — konsisten dengan identitas warna "rose/red" Aura, bukan default Material3 generik
+val AuraErrorLight = Color(0xFFDC2626)
+val AuraOnErrorLight = Color(0xFFFFFFFF)
+val AuraErrorContainerLight = Color(0xFFFEE2E2)
+val AuraOnErrorContainerLight = Color(0xFF991B1B)
+
+val AuraErrorDark = Color(0xFFF87171)
+val AuraOnErrorDark = Color(0xFF450A0A)
+val AuraErrorContainerDark = Color(0xFF7F1D1D)
+val AuraOnErrorContainerDark = Color(0xFFFECACA)
+
+// Secondary container — selaras dengan secondary color yang sudah ada
+val AuraSecondaryContainerLight = Color(0xFFCCFBF1)
+val AuraOnSecondaryContainerLight = Color(0xFF134E4A)
+val AuraSecondaryContainerDark = Color(0xFF115E59)
+val AuraOnSecondaryContainerDark = Color(0xFF99F6E4)
+
+// Tertiary — dipetakan ke nuansa netral-hangat agar tetap serasi tanpa bentrok dengan 6 varian accent
+val AuraTertiaryLight = Color(0xFF7C6F64)
+val AuraOnTertiaryLight = Color(0xFFFFFFFF)
+val AuraTertiaryContainerLight = Color(0xFFF3EDE4)
+val AuraOnTertiaryContainerLight = Color(0xFF3A322A)
+
+val AuraTertiaryDark = Color(0xFFD8CBBE)
+val AuraOnTertiaryDark = Color(0xFF3A322A)
+val AuraTertiaryContainerDark = Color(0xFF4E4438)
+val AuraOnTertiaryContainerDark = Color(0xFFF3EDE4)
+
+// Inverse & scrim — dibutuhkan untuk Snackbar, tooltip, dan elemen kontras-terbalik lain
+val AuraInverseSurfaceLight = Color(0xFF1E293B)
+val AuraInverseOnSurfaceLight = Color(0xFFF8FAFC)
+val AuraInversePrimaryLight = Color(0xFF7DD3FC)
+
+val AuraInverseSurfaceDark = Color(0xFFE2E8F0)
+val AuraInverseOnSurfaceDark = Color(0xFF1E293B)
+val AuraInversePrimaryDark = Color(0xFF0284C7)
+
+val AuraScrim = Color(0xFF000000)
+val AuraOutlineVariantLight = Color(0xFFCBD5E1)
+val AuraOutlineVariantDark = Color(0xFF334155)
+
