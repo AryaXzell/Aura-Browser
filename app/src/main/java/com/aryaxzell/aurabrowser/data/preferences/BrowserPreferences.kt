@@ -31,7 +31,27 @@ class BrowserPreferences(context: Context) {
         private const val KEY_WALLPAPER_BLUR_ENABLED = "pref_wallpaper_blur_enabled"
         private const val KEY_HOME_ICON_URI = "pref_home_icon_uri"
         private const val KEY_SHORTCUTS = "pref_shortcuts"
+        private const val KEY_DNS_PROVIDER = "pref_dns_provider"
+        private const val KEY_DNS_CUSTOM_VALUE = "pref_dns_custom_value"
     }
+
+    private val _dnsProvider = MutableStateFlow(prefs.getString(KEY_DNS_PROVIDER, "system") ?: "system")
+    val dnsProviderFlow: StateFlow<String> = _dnsProvider.asStateFlow()
+    var dnsProvider: String
+        get() = _dnsProvider.value
+        set(value) {
+            prefs.edit().putString(KEY_DNS_PROVIDER, value).apply()
+            _dnsProvider.value = value
+        }
+
+    private val _dnsCustomValue = MutableStateFlow(prefs.getString(KEY_DNS_CUSTOM_VALUE, "") ?: "")
+    val dnsCustomValueFlow: StateFlow<String> = _dnsCustomValue.asStateFlow()
+    var dnsCustomValue: String
+        get() = _dnsCustomValue.value
+        set(value) {
+            prefs.edit().putString(KEY_DNS_CUSTOM_VALUE, value).apply()
+            _dnsCustomValue.value = value
+        }
 
     private val _homeIconUri = MutableStateFlow(prefs.getString(KEY_HOME_ICON_URI, null))
     val homeIconUriFlow: StateFlow<String?> = _homeIconUri.asStateFlow()

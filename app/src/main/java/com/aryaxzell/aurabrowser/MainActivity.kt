@@ -165,6 +165,8 @@ fun BrowserApp(
     val isDesktopModeDefault by viewModel.isDesktopModeDefault.collectAsStateWithLifecycle()
     val isJavaScriptEnabled by viewModel.isJavaScriptEnabled.collectAsStateWithLifecycle()
     val isDoNotTrackEnabled by viewModel.isDoNotTrackEnabled.collectAsStateWithLifecycle()
+    val dnsProvider by viewModel.dnsProvider.collectAsStateWithLifecycle()
+    val dnsCustomValue by viewModel.dnsCustomValue.collectAsStateWithLifecycle()
 
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
@@ -407,6 +409,10 @@ fun BrowserApp(
             onToggleJavaScript = { viewModel.updateJavaScript(it) },
             isDoNotTrack = isDoNotTrackEnabled,
             onToggleDoNotTrack = { viewModel.updateDoNotTrack(it) },
+            dnsProvider = dnsProvider,
+            dnsCustomValue = dnsCustomValue,
+            onUpdateDnsProvider = { viewModel.updateDnsProvider(it) },
+            onUpdateDnsCustomValue = { viewModel.updateDnsCustomValue(it) },
             onClearBrowsingData = { clearCache, clearHistory, clearCookies ->
                 viewModel.clearBrowsingData(clearCache, clearHistory, clearCookies)
             },

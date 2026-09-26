@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Language
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.animation.AnimatedVisibility
@@ -139,6 +140,10 @@ fun SettingsView(
     onToggleJavaScript: (Boolean) -> Unit,
     isDoNotTrack: Boolean,
     onToggleDoNotTrack: (Boolean) -> Unit,
+    dnsProvider: String = "system",
+    dnsCustomValue: String = "",
+    onUpdateDnsProvider: (String) -> Unit = {},
+    onUpdateDnsCustomValue: (String) -> Unit = {},
     onClearBrowsingData: (clearCache: Boolean, clearHistory: Boolean, clearCookies: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -274,6 +279,10 @@ fun SettingsView(
                                         onToggleAdBlock = onToggleAdBlock,
                                         isDoNotTrack = isDoNotTrack,
                                         onToggleDoNotTrack = onToggleDoNotTrack,
+                                        dnsProvider = dnsProvider,
+                                        dnsCustomValue = dnsCustomValue,
+                                        onUpdateDnsProvider = onUpdateDnsProvider,
+                                        onUpdateDnsCustomValue = onUpdateDnsCustomValue,
                                         onOpenClearData = { showClearDataDialog = true }
                                     )
                                     3 -> BrowserTabContent(
@@ -484,6 +493,10 @@ private fun PrivacyTabContent(
     onToggleAdBlock: (Boolean) -> Unit,
     isDoNotTrack: Boolean,
     onToggleDoNotTrack: (Boolean) -> Unit,
+    dnsProvider: String,
+    dnsCustomValue: String,
+    onUpdateDnsProvider: (String) -> Unit,
+    onUpdateDnsCustomValue: (String) -> Unit,
     onOpenClearData: () -> Unit
 ) {
     val context = LocalContext.current
@@ -519,6 +532,120 @@ private fun PrivacyTabContent(
                     checked = isDoNotTrack,
                     onCheckedChange = onToggleDoNotTrack
                 )
+            }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Card: Secure & Private DNS
+    var showDnsDialog by remember { mutableStateOf(false) }
+
+    IOSCardGroup(
+        header = "SECURE & PRIVATE DNS",
+        footer = "Encrypt your DNS queries with Secure DNS (DoH/DoT) to prevent snooping and tampering by your ISP."
+    ) {
+        IOSSettingsRow(
+            icon = Icons.Default.Language,
+            iconBgColor = Color(0xFF5856D6), // iOS System Purple
+            title = "Secure DNS Provider",
+            subtitle = when(dnsProvider) {
+                "system" -> "Default (System)"
+                "cloudflare" -> "Cloudflare (1.1.1.1)"
+                "google" -> "Google DNS (8.8.8.8)"
+                "adguard" -> "AdGuard DNS"
+                "custom" -> if (dnsCustomValue.isBlank()) "Custom (Not set)" else "Custom: $dnsCustomValue"
+                else -> dnsProvider
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = when(dnsProvider) {
+                            "system" -> "System"
+                            "cloudflare" -> "Cloudflare"
+                            "google" -> "Google"
+                            "adguard" -> "AdGuard"
+                            "custom" -> "Custom"
+                            else -> "System"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            },
+            onClick = { showDnsDialog = true }
+        )
+    }
+
+    if (showDnsDialog) {
+        var selectedProvider by remember { mutableStateOf(dnsProvider) }
+        var customValueInput by remember { mutableStateOf(dnsCustomValue) }
+
+        AlertDialog(
+            onDismissRequest = { showDnsDialog = false },
+            title = { Text("Pilih Secure DNS") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    val dnsList = listOf(
+                        "system" to "Sistem (Bawaan)",
+                        "cloudflare" to "Cloudflare (1.1.1.1)",
+                        "google" to "Google Public DNS",
+                        "adguard" to "AdGuard DNS",
+                        "custom" to "DNS Kustom (IP / DoH)"
+                    )
+
+                    dnsList.forEach { (prov, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedProvider = prov }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.RadioButton(
+                                selected = (selectedProvider == prov),
+                                onClick = { selectedProvider = prov }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+
+                    if (selectedProvider == "custom") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = customValueInput,
+                            onValueChange = { customValueInput = it },
+                            label = { Text("IP atau Domain DNS (DoH)") },
+                            placeholder = { Text("https://example.com/dns-query") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onUpdateDnsProvider(selectedProvider)
+                        onUpdateDnsCustomValue(customValueInput)
+                        showDnsDialog = false
+                    }
+                ) {
+                    Text("Simpan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDnsDialog = false }) {
+                    Text("Batal")
+                }
             }
         )
     }

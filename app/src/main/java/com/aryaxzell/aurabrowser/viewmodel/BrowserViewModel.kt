@@ -419,6 +419,17 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         preferences.homeIconUri = uri
     }
 
+    val dnsProvider: StateFlow<String> = preferences.dnsProviderFlow
+    val dnsCustomValue: StateFlow<String> = preferences.dnsCustomValueFlow
+
+    fun updateDnsProvider(provider: String) {
+        preferences.dnsProvider = provider
+    }
+
+    fun updateDnsCustomValue(value: String) {
+        preferences.dnsCustomValue = value
+    }
+
     // Sheet visibility setters
     fun setTabSwitcherVisible(visible: Boolean) {
         _showTabSwitcher.value = visible
