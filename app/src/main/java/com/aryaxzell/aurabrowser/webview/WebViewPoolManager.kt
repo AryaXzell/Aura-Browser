@@ -17,6 +17,21 @@ class WebViewPoolManager {
     private val pool = mutableMapOf<String, WebView>()
     private val lastAccessedMap = mutableMapOf<String, Long>()
 
+    fun prewarmWebView(context: Context) {
+        // Post to Main Thread Looper as an IdleHandler to run ONLY after the main UI thread is completely idle (first frame drawn)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.os.Looper.myQueue().addIdleHandler {
+                try {
+                    val prewarmed = WebView(context.applicationContext)
+                    prewarmed.loadUrl("about:blank")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                false // Run once and remove
+            }
+        }
+    }
+
     @Synchronized
     fun getOrCreateWebView(tabId: String, context: Context, onCreate: (WebView) -> Unit): WebView {
         val existing = pool[tabId]

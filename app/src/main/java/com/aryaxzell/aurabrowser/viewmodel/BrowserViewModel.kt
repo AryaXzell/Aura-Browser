@@ -151,12 +151,59 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         return currentTabs.find { it.id == currentId } ?: currentTabs.firstOrNull() ?: initialTab
     }
 
+    private val _searchSuggestions = MutableStateFlow<List<String>>(emptyList())
+    val searchSuggestions: StateFlow<List<String>> = _searchSuggestions.asStateFlow()
+
+    private var searchSuggestJob: Job? = null
+
+    private fun parseSuggestions(json: String): List<String> {
+        try {
+            val startIndex = json.indexOf(",[")
+            if (startIndex == -1) return emptyList()
+            val endIndex = json.indexOf("],", startIndex)
+            if (endIndex == -1) return emptyList()
+            val arrayContent = json.substring(startIndex + 2, endIndex)
+            if (arrayContent.isBlank()) return emptyList()
+            
+            return arrayContent.split(",")
+                .map { it.trim().removeSurrounding("\"").removeSurrounding("'") }
+                .filter { it.isNotBlank() }
+                .take(4)
+        } catch (e: Exception) {
+            return emptyList()
+        }
+    }
+
     fun setUrlInput(input: String) {
         _urlInput.value = input
     }
 
     fun updateUrlInput(input: String) {
         setUrlInput(input)
+        
+        searchSuggestJob?.cancel()
+        if (input.isBlank()) {
+            _searchSuggestions.value = emptyList()
+            return
+        }
+        
+        searchSuggestJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(250) // Debounce to save CPU/network
+            try {
+                val encodedQuery = java.net.URLEncoder.encode(input, "UTF-8")
+                val url = java.net.URL("https://suggestqueries.google.com/complete/search?client=chrome&q=$encodedQuery")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 3000
+                connection.readTimeout = 3000
+                
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val parsed = parseSuggestions(responseText)
+                _searchSuggestions.value = parsed
+            } catch (e: Exception) {
+                _searchSuggestions.value = emptyList()
+            }
+        }
     }
 
     fun setIsEditingUrl(isEditing: Boolean) {
@@ -164,6 +211,8 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         if (isEditing) {
             val active = getActiveTab()
             _urlInput.value = if (active.isHome) "" else active.url
+        } else {
+            _searchSuggestions.value = emptyList()
         }
     }
 

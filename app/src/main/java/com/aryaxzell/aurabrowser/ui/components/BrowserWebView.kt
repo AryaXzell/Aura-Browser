@@ -12,8 +12,15 @@ import android.os.Environment
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
+import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
+import java.io.File
+import java.io.FileOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -243,21 +250,49 @@ fun BrowserWebView(
                         CookieManager.getInstance().setAcceptCookie(!isActiveTabIncognito)
                         CookieManager.getInstance().setAcceptThirdPartyCookies(newView, !isActiveTabIncognito)
 
+                        // Register Blob Downloader Interface
+                        newView.addJavascriptInterface(BlobDownloadInterface(ctx, downloadTracker), "BlobDownloader")
+
                         // Download listener using Android DownloadManager
                         newView.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
                             try {
-                                val request = DownloadManager.Request(Uri.parse(url)).apply {
-                                    setMimeType(mimetype)
+                                if (url.startsWith("blob:")) {
                                     val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
-                                    setTitle(filename)
-                                    setDescription("Downloading with Aura Browser")
-                                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                                    val jsCode = """
+                                        (function() {
+                                            var xhr = new XMLHttpRequest();
+                                            xhr.open('GET', '$url', true);
+                                            xhr.responseType = 'blob';
+                                            xhr.onload = function(e) {
+                                                if (this.status == 200) {
+                                                    var blob = this.response;
+                                                    var reader = new FileReader();
+                                                    reader.readAsDataURL(blob);
+                                                    reader.onloadend = function() {
+                                                        var base64data = reader.result;
+                                                        BlobDownloader.onBlobDownloaded(base64data, '$mimetype', '$filename');
+                                                    }
+                                                }
+                                            };
+                                            xhr.send();
+                                        })()
+                                    """.trimIndent()
+                                    newView.evaluateJavascript(jsCode, null)
+                                    Toast.makeText(ctx, "Memproses unduhan blob...", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val request = DownloadManager.Request(Uri.parse(url)).apply {
+                                        setMimeType(mimetype)
+                                        val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
+                                        setTitle(filename)
+                                        setDescription("Downloading with Aura Browser")
+                                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                                    }
+                                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                    val downloadId = dm.enqueue(request)
+                                    downloadTracker?.registerOwnedDownload(downloadId)
+                                    Toast.makeText(ctx, "Download started: ${URLUtil.guessFileName(url, contentDisposition, mimetype)}", Toast.LENGTH_SHORT).show()
                                 }
-                                val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                val downloadId = dm.enqueue(request)
-                                downloadTracker?.registerOwnedDownload(downloadId)
-                                Toast.makeText(ctx, "Download started: ${URLUtil.guessFileName(url, contentDisposition, mimetype)}", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
                                 Toast.makeText(ctx, "Unable to start download: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                             }
@@ -566,4 +601,41 @@ private fun isKnownTrackerPath(path: String): Boolean {
         path.contains("/pixel.gif") ||
         path.contains("/track.gif") ||
         path.contains("/beacon")
+}
+
+class BlobDownloadInterface(
+    private val context: Context,
+    private val downloadTracker: DownloadTracker?
+) {
+    @JavascriptInterface
+    fun onBlobDownloaded(base64Data: String, mimeType: String, suggestedFilename: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val cleanBase64 = if (base64Data.contains(",")) {
+                    base64Data.substring(base64Data.indexOf(",") + 1)
+                } else {
+                    base64Data
+                }
+                
+                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs()
+                }
+                val file = File(downloadsDir, suggestedFilename)
+                
+                FileOutputStream(file).use { fos ->
+                    fos.write(bytes)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Download blob selesai: $suggestedFilename", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Gagal mengunduh blob: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 }
