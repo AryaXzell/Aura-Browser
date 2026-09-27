@@ -20,6 +20,16 @@ object MemoryCache {
         }
     }
 
+    fun initialize(context: android.content.Context) {
+        val am = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        val tunedSize = if (am != null && am.isLowRamDevice) {
+            2 * 1024 * 1024 // 2MB on low-RAM devices to prevent memory pressure
+        } else {
+            8 * 1024 * 1024 // 8MB on standard devices
+        }
+        cache.resize(tunedSize)
+    }
+
     class CachedResource(
         val mimeType: String,
         val encoding: String,

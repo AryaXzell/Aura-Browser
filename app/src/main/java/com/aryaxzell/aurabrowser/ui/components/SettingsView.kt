@@ -1,6 +1,7 @@
 package com.aryaxzell.aurabrowser.ui.components
 
 import androidx.activity.compose.BackHandler
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,8 +96,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -153,6 +159,47 @@ fun SettingsView(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNameEditDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    var pendingCropBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var refreshDataKey by remember { mutableIntStateOf(0) }
+
+    val dataSizeInfo by produceState(
+        initialValue = BrowsingDataSizeInfo("Calculating...", "Calculating...", 0L),
+        key1 = refreshDataKey
+    ) {
+        value = withContext(Dispatchers.IO) { calculateBrowsingDataSize(context) }
+    }
+
+    val homeIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val downsampled = decodeDownsampledBitmap(context, uri, maxDimension = 1024)
+                pendingCropBitmap = downsampled
+            } catch (e: Exception) {
+                // Ignore decode failure
+            }
+        }
+    }
+
+    val wallpaperPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Some providers might not support persistable permissions
+            }
+            onUpdateWallpaperUri(uri.toString())
+        }
+    }
 
     val tabs = listOf("General", "Appearance", "Privacy", "Browser")
 
@@ -213,7 +260,7 @@ fun SettingsView(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // iOS Segmented Control
-                    IOSSegmentedControl(
+                    SegmentedControl(
                         tabs = tabs,
                         selectedIndex = selectedTab,
                         onTabSelected = { selectedTab = it }
@@ -234,20 +281,20 @@ fun SettingsView(
                             },
                             label = "settings_tab_transition"
                         ) { currentTab ->
-                            Column(
+                            LazyColumn(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
+                                    .fillMaxSize()
                                     .padding(bottom = 24.dp)
                             ) {
                                 when (currentTab) {
-                                    0 -> GeneralTabContent(
+                                    0 -> generalTabContent(
                                         currentSearchEngine = currentSearchEngine,
                                         onSelectSearchEngine = onSelectSearchEngine,
                                         userName = userName,
                                         onOpenEditName = { showNameEditDialog = true }
                                     )
-                                    1 -> AppearanceTabContent(
+                                    1 -> appearanceTabContent(
+                                        context = context,
                                         themeMode = themeMode,
                                         onSelectThemeMode = onSelectThemeMode,
                                         accentColor = accentColor,
@@ -265,20 +312,29 @@ fun SettingsView(
                                         showShortcuts = showShortcuts,
                                         onToggleShowShortcuts = onToggleShowShortcuts,
                                         showRecentHistory = showRecentHistory,
-                                        onToggleShowRecentHistory = onToggleShowRecentHistory
+                                        onToggleShowRecentHistory = onToggleShowRecentHistory,
+                                        homeIconPickerLauncher = homeIconPickerLauncher,
+                                        wallpaperPickerLauncher = wallpaperPickerLauncher,
+                                        pendingCropBitmap = pendingCropBitmap,
+                                        onPendingCropBitmapChange = { pendingCropBitmap = it }
                                     )
-                                    2 -> PrivacyTabContent(
+                                    2 -> privacyTabContent(
                                         isAdBlockEnabled = isAdBlockEnabled,
                                         onToggleAdBlock = onToggleAdBlock,
                                         isDoNotTrack = isDoNotTrack,
                                         onToggleDoNotTrack = onToggleDoNotTrack,
-                                        onOpenClearData = { showClearDataDialog = true }
+                                        dataSizeInfo = dataSizeInfo,
+                                        onOpenClearData = {
+                                            refreshDataKey++
+                                            showClearDataDialog = true
+                                        }
                                     )
-                                    3 -> BrowserTabContent(
+                                    3 -> browserTabContent(
                                         isDesktopModeDefault = isDesktopModeDefault,
                                         onToggleDesktopDefault = onToggleDesktopDefault,
                                         isJavaScriptEnabled = isJavaScriptEnabled,
-                                        onToggleJavaScript = onToggleJavaScript
+                                        onToggleJavaScript = onToggleJavaScript,
+                                        uriHandler = uriHandler
                                     )
                                 }
                             }
@@ -328,7 +384,12 @@ fun SettingsView(
         var clearHistory by remember { mutableStateOf(true) }
         var clearCache by remember { mutableStateOf(true) }
         var clearCookies by remember { mutableStateOf(false) }
-        val sizeInfo = remember(showClearDataDialog) { calculateBrowsingDataSize(context) }
+        val sizeInfo by produceState(
+            initialValue = BrowsingDataSizeInfo("Calculating...", "Calculating...", 0L),
+            key1 = showClearDataDialog
+        ) {
+            value = withContext(Dispatchers.IO) { calculateBrowsingDataSize(context) }
+        }
 
         AlertDialog(
             onDismissRequest = { showClearDataDialog = false },
@@ -405,165 +466,166 @@ fun SettingsView(
 // TAB CONTENT IMPLEMENTATIONS (iOS Inset Grouped Card Style)
 // -------------------------------------------------------------
 
-@Composable
-private fun GeneralTabContent(
+private fun LazyListScope.generalTabContent(
     currentSearchEngine: SearchEngine,
     onSelectSearchEngine: (SearchEngine) -> Unit,
     userName: String,
     onOpenEditName: () -> Unit
 ) {
     // Card 1: Default Search Engine
-    IOSCardGroup(
-        header = "DEFAULT SEARCH ENGINE",
-        footer = "Queries typed into the address bar will search with the selected provider."
-    ) {
-        SearchEngine.values().forEachIndexed { index, engine ->
-            val isSelected = currentSearchEngine == engine
-            IOSSettingsRow(
-                icon = Icons.Default.Search,
-                iconBgColor = Color(0xFF007AFF), // iOS System Blue
-                title = engine.displayName,
-                trailingContent = {
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                },
-                onClick = { onSelectSearchEngine(engine) }
-            )
-            if (index < SearchEngine.values().size - 1) {
-                IOSHairlineDivider()
+    item {
+        IOSCardGroup(
+            header = "DEFAULT SEARCH ENGINE",
+            footer = "Queries typed into the address bar will search with the selected provider."
+        ) {
+            SearchEngine.values().forEachIndexed { index, engine ->
+                val isSelected = currentSearchEngine == engine
+                IOSSettingsRow(
+                    icon = Icons.Default.Search,
+                    iconBgColor = Color(0xFF007AFF), // iOS System Blue
+                    title = engine.displayName,
+                    trailingContent = {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    },
+                    onClick = { onSelectSearchEngine(engine) }
+                )
+                if (index < SearchEngine.values().size - 1) {
+                    IOSHairlineDivider()
+                }
             }
         }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
     // Card 2: Personalization
-    IOSCardGroup(
-        header = "PERSONALIZATION",
-        footer = "Your greeting name appears on the browser home screen."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Person,
-            iconBgColor = Color(0xFFFF9500), // iOS System Orange
-            title = "Greeting Name",
-            subtitle = userName,
-            trailingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Edit",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            },
-            onClick = onOpenEditName
-        )
+    item {
+        IOSCardGroup(
+            header = "PERSONALIZATION",
+            footer = "Your greeting name appears on the browser home screen."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Person,
+                iconBgColor = Color(0xFFFF9500), // iOS System Orange
+                title = "Greeting Name",
+                subtitle = userName,
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Edit",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                onClick = onOpenEditName
+            )
+        }
     }
 }
 
-@Composable
-private fun PrivacyTabContent(
+private fun LazyListScope.privacyTabContent(
     isAdBlockEnabled: Boolean,
     onToggleAdBlock: (Boolean) -> Unit,
     isDoNotTrack: Boolean,
     onToggleDoNotTrack: (Boolean) -> Unit,
+    dataSizeInfo: BrowsingDataSizeInfo,
     onOpenClearData: () -> Unit
 ) {
-    val context = LocalContext.current
-    var dataSizeInfo by remember { mutableStateOf(calculateBrowsingDataSize(context)) }
-
     // Card 1: Content Blocking & Protection
-    IOSCardGroup(
-        header = "CONTENT & PRIVACY PROTECTION",
-        footer = "Aura Browser blocks known analytics and ad trackers to protect your privacy and speed up loading."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Shield,
-            iconBgColor = Color(0xFF34C759), // iOS System Green
-            title = "Block Ads & Trackers",
-            subtitle = "Filters intrusive ads and trackers",
-            trailingContent = {
-                Switch(
-                    checked = isAdBlockEnabled,
-                    onCheckedChange = onToggleAdBlock
-                )
-            }
-        )
-
-        IOSHairlineDivider()
-
-        IOSSettingsRow(
-            icon = Icons.Default.Security,
-            iconBgColor = Color(0xFF007AFF), // iOS System Blue
-            title = "Do Not Track (DNT)",
-            subtitle = "Sends DNT request header to websites",
-            trailingContent = {
-                Switch(
-                    checked = isDoNotTrack,
-                    onCheckedChange = onToggleDoNotTrack
-                )
-            }
-        )
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    // Card 2: Browsing Data Management
-    IOSCardGroup(
-        header = "BROWSING DATA",
-        footer = "Remove stored browsing history, cached files, or saved cookies from your device."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.DeleteOutline,
-            iconBgColor = Color(0xFFFF3B30), // iOS System Red
-            title = "Clear Browsing Data",
-            subtitle = "Stored: ${dataSizeInfo.totalSizeStr} (History, Cache & Cookies)",
-            titleColor = MaterialTheme.colorScheme.error,
-            trailingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-                    ) {
-                        Text(
-                            text = dataSizeInfo.totalSizeStr,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(18.dp)
+    item {
+        IOSCardGroup(
+            header = "CONTENT & PRIVACY PROTECTION",
+            footer = "Aura Browser blocks known analytics and ad trackers to protect your privacy and speed up loading."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Shield,
+                iconBgColor = Color(0xFF34C759), // iOS System Green
+                title = "Block Ads & Trackers",
+                subtitle = "Filters intrusive ads and trackers",
+                trailingContent = {
+                    Switch(
+                        checked = isAdBlockEnabled,
+                        onCheckedChange = onToggleAdBlock
                     )
                 }
-            },
-            onClick = {
-                dataSizeInfo = calculateBrowsingDataSize(context)
-                onOpenClearData()
-            }
-        )
+            )
+
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.Security,
+                iconBgColor = Color(0xFF007AFF), // iOS System Blue
+                title = "Do Not Track (DNT)",
+                subtitle = "Sends DNT request header to websites",
+                trailingContent = {
+                    Switch(
+                        checked = isDoNotTrack,
+                        onCheckedChange = onToggleDoNotTrack
+                    )
+                }
+            )
+        }
+    }
+
+    item { Spacer(modifier = Modifier.height(20.dp)) }
+
+    // Card 2: Browsing Data Management
+    item {
+        IOSCardGroup(
+            header = "BROWSING DATA",
+            footer = "Remove stored browsing history, cached files, or saved cookies from your device."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.DeleteOutline,
+                iconBgColor = Color(0xFFFF3B30), // iOS System Red
+                title = "Clear Browsing Data",
+                subtitle = "Stored: ${dataSizeInfo.totalSizeStr} (History, Cache & Cookies)",
+                titleColor = MaterialTheme.colorScheme.error,
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = dataSizeInfo.totalSizeStr,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                onClick = onOpenClearData
+            )
+        }
     }
 }
 
-@Composable
-private fun AppearanceTabContent(
+private fun LazyListScope.appearanceTabContent(
+    context: Context,
     themeMode: String,
     onSelectThemeMode: (String) -> Unit,
     accentColor: String,
@@ -576,111 +638,36 @@ private fun AppearanceTabContent(
     isWallpaperBlurEnabled: Boolean,
     onUpdateWallpaperUri: (String?) -> Unit,
     onUpdateWallpaperBlur: (Boolean) -> Unit,
-    homeIconUri: String? = null,
-    onUpdateHomeIconUri: (String?) -> Unit = {},
+    homeIconUri: String?,
+    onUpdateHomeIconUri: (String?) -> Unit,
     showShortcuts: Boolean,
     onToggleShowShortcuts: (Boolean) -> Unit,
     showRecentHistory: Boolean,
-    onToggleShowRecentHistory: (Boolean) -> Unit
+    onToggleShowRecentHistory: (Boolean) -> Unit,
+    homeIconPickerLauncher: androidx.activity.result.ActivityResultLauncher<PickVisualMediaRequest>,
+    wallpaperPickerLauncher: androidx.activity.result.ActivityResultLauncher<PickVisualMediaRequest>,
+    pendingCropBitmap: Bitmap?,
+    onPendingCropBitmapChange: (Bitmap?) -> Unit
 ) {
-    val context = LocalContext.current
-    var pendingCropBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
-    val homeIconPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            try {
-                val downsampled = decodeDownsampledBitmap(context, uri, maxDimension = 1024)
-                pendingCropBitmap = downsampled
-            } catch (e: Exception) {
-                // Ignore decode failure
-            }
-        }
-    }
-
-    val wallpaperPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                // Some providers might not support persistable permissions
-            }
-            onUpdateWallpaperUri(uri.toString())
-        }
-    }
-
     // Card 1: Theme Mode
-    IOSCardGroup(
-        header = "THEME MODE",
-        footer = "Choose between dark, light, or automatically matching your system theme."
-    ) {
-        val themes = listOf(
-            "system" to "Follow System",
-            "light" to "Light",
-            "dark" to "Dark"
-        )
-        themes.forEachIndexed { index, (key, label) ->
-            val isSelected = themeMode == key
-            IOSSettingsRow(
-                icon = Icons.Default.Palette,
-                iconBgColor = Color(0xFFAF52DE), // iOS System Purple
-                title = label,
-                trailingContent = {
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                },
-                onClick = { onSelectThemeMode(key) }
+    item {
+        IOSCardGroup(
+            header = "THEME MODE",
+            footer = "Choose between dark, light, or automatically matching your system theme."
+        ) {
+            val themes = listOf(
+                "system" to "Follow System",
+                "light" to "Light",
+                "dark" to "Dark"
             )
-            if (index < themes.size - 1) {
-                IOSHairlineDivider()
-            }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    // Card 2: Accent Color Palette
-    IOSCardGroup(
-        header = "ACCENT COLOR",
-        footer = "Customize buttons, icons, highlights, and navigation accents throughout Aura Browser."
-    ) {
-        val accentList = listOf(
-            Triple("blue", "Aura Blue", Color(0xFF0284C7)),
-            Triple("green", "Emerald Green", Color(0xFF059669)),
-            Triple("purple", "Sunset Violet", Color(0xFF7C3AED)),
-            Triple("rose", "Ruby Rose", Color(0xFFE11D48)),
-            Triple("gold", "Amber Gold", Color(0xFFD97706)),
-            Triple("cyan", "Electric Cyan", Color(0xFF0891B2))
-        )
-
-        accentList.forEachIndexed { index, (key, label, color) ->
-            val isSelected = accentColor == key
-            IOSSettingsRow(
-                icon = Icons.Default.ColorLens,
-                iconBgColor = color,
-                title = label,
-                trailingContent = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
+            themes.forEachIndexed { index, (key, label) ->
+                val isSelected = themeMode == key
+                IOSSettingsRow(
+                    icon = Icons.Default.Palette,
+                    iconBgColor = Color(0xFFAF52DE), // iOS System Purple
+                    title = label,
+                    trailingContent = {
                         if (isSelected) {
-                            Spacer(modifier = Modifier.width(8.dp))
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = "Selected",
@@ -688,128 +675,274 @@ private fun AppearanceTabContent(
                                 modifier = Modifier.size(19.dp)
                             )
                         }
-                    }
-                },
-                onClick = { onSelectAccentColor(key) }
-            )
-            if (index < accentList.size - 1) {
-                IOSHairlineDivider()
+                    },
+                    onClick = { onSelectThemeMode(key) }
+                )
+                if (index < themes.size - 1) {
+                    IOSHairlineDivider()
+                }
             }
         }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    item { Spacer(modifier = Modifier.height(20.dp)) }
+
+    // Card 2: Accent Color Palette
+    item {
+        IOSCardGroup(
+            header = "ACCENT COLOR",
+            footer = "Customize buttons, icons, highlights, and navigation accents throughout Aura Browser."
+        ) {
+            val accentList = listOf(
+                Triple("blue", "Aura Blue", Color(0xFF0284C7)),
+                Triple("green", "Emerald Green", Color(0xFF059669)),
+                Triple("purple", "Sunset Violet", Color(0xFF7C3AED)),
+                Triple("rose", "Ruby Rose", Color(0xFFE11D48)),
+                Triple("gold", "Amber Gold", Color(0xFFD97706)),
+                Triple("cyan", "Electric Cyan", Color(0xFF0891B2))
+            )
+
+            accentList.forEachIndexed { index, (key, label, color) ->
+                val isSelected = accentColor == key
+                IOSSettingsRow(
+                    icon = Icons.Default.ColorLens,
+                    iconBgColor = color,
+                    title = label,
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+                    },
+                    onClick = { onSelectAccentColor(key) }
+                )
+                if (index < accentList.size - 1) {
+                    IOSHairlineDivider()
+                }
+            }
+        }
+    }
+
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
     // Card 3: Tab Switcher Layout
-    IOSCardGroup(
-        header = "TAB SWITCHER LAYOUT",
-        footer = "Choose between standard 2-column grid and vertical full-width list view for open tabs."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.GridView,
-            iconBgColor = Color(0xFF5856D6),
-            title = "Layout Mode",
-            subtitle = if (tabSwitcherLayout == "grid") "Grid View" else "List View",
-            trailingContent = {
-                Box(modifier = Modifier.width(150.dp)) {
-                    IOSSegmentedControl(
-                        tabs = listOf("Grid", "List"),
-                        selectedIndex = if (tabSwitcherLayout == "grid") 0 else 1,
-                        onTabSelected = { index ->
-                            onSelectTabSwitcherLayout(if (index == 0) "grid" else "list")
-                        }
-                    )
+    item {
+        IOSCardGroup(
+            header = "TAB SWITCHER LAYOUT",
+            footer = "Choose between standard 2-column grid and vertical full-width list view for open tabs."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.GridView,
+                iconBgColor = Color(0xFF5856D6),
+                title = "Layout Mode",
+                subtitle = if (tabSwitcherLayout == "grid") "Grid View" else "List View",
+                trailingContent = {
+                    Box(modifier = Modifier.width(150.dp)) {
+                        SegmentedControl(
+                            tabs = listOf("Grid", "List"),
+                            selectedIndex = if (tabSwitcherLayout == "grid") 0 else 1,
+                            onTabSelected = { index ->
+                                onSelectTabSwitcherLayout(if (index == 0) "grid" else "list")
+                            }
+                        )
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
     // Card 4: Bottom Navigation Bar Customization
-    IOSCardGroup(
-        header = "BOTTOM BAR CUSTOMIZATION",
-        footer = "Select up to 5 actions to display on the floating bottom navigation bar."
-    ) {
-        val availableItems = listOf(
-            "back" to "Back Button",
-            "forward" to "Forward Button",
-            "home" to "Home / New Tab",
-            "tabs" to "Tab Switcher",
-            "downloads" to "Downloads",
-            "bookmarks" to "Bookmarks",
-            "history" to "History"
-        )
-
-        availableItems.forEachIndexed { index, (key, label) ->
-            val isChecked = key in bottomBarItems
-            val canCheck = isChecked || bottomBarItems.size < 5
-
-            IOSSettingsRow(
-                icon = Icons.Default.Apps,
-                iconBgColor = Color(0xFF007AFF),
-                title = label,
-                subtitle = if (!isChecked && bottomBarItems.size >= 5) "Max 5 items reached" else null,
-                trailingContent = {
-                    Switch(
-                        checked = isChecked,
-                        enabled = canCheck,
-                        onCheckedChange = { checked ->
-                            val updated = if (checked) {
-                                if (bottomBarItems.size < 5) bottomBarItems + key else bottomBarItems
-                            } else {
-                                bottomBarItems - key
-                            }
-                            onUpdateBottomBarItems(updated)
-                        }
-                    )
-                }
+    item {
+        IOSCardGroup(
+            header = "BOTTOM BAR CUSTOMIZATION",
+            footer = "Select up to 5 actions to display on the floating bottom navigation bar."
+        ) {
+            val availableItems = listOf(
+                "back" to "Back Button",
+                "forward" to "Forward Button",
+                "home" to "Home / New Tab",
+                "tabs" to "Tab Switcher",
+                "downloads" to "Downloads",
+                "bookmarks" to "Bookmarks",
+                "history" to "History"
             )
-            if (index < availableItems.size - 1) {
-                IOSHairlineDivider()
+
+            availableItems.forEachIndexed { index, (key, label) ->
+                val isChecked = key in bottomBarItems
+                val canCheck = isChecked || bottomBarItems.size < 5
+
+                IOSSettingsRow(
+                    icon = Icons.Default.Apps,
+                    iconBgColor = Color(0xFF007AFF),
+                    title = label,
+                    subtitle = if (!isChecked && bottomBarItems.size >= 5) "Max 5 items reached" else null,
+                    trailingContent = {
+                        Switch(
+                            checked = isChecked,
+                            enabled = canCheck,
+                            onCheckedChange = { checked ->
+                                val updated = if (checked) {
+                                    if (bottomBarItems.size < 5) bottomBarItems + key else bottomBarItems
+                                } else {
+                                    bottomBarItems - key
+                                }
+                                onUpdateBottomBarItems(updated)
+                            }
+                        )
+                    }
+                )
+                if (index < availableItems.size - 1) {
+                    IOSHairlineDivider()
+                }
             }
         }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
     // Card 5: Homepage Background & Wallpaper
-    IOSCardGroup(
-        header = "HOMEPAGE BACKGROUND",
-        footer = "Personalize your new tab home page with a photo from your device gallery."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Wallpaper,
-            iconBgColor = Color(0xFFFF2D55),
-            title = "Choose Wallpaper",
-            subtitle = if (wallpaperUri != null) "Custom wallpaper set" else "Using default background",
-            onClick = {
-                wallpaperPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+    item {
+        IOSCardGroup(
+            header = "HOMEPAGE BACKGROUND",
+            footer = "Personalize your new tab home page with a photo from your device gallery."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Wallpaper,
+                iconBgColor = Color(0xFFFF2D55),
+                title = "Choose Wallpaper",
+                subtitle = if (wallpaperUri != null) "Custom wallpaper set" else "Using default background",
+                onClick = {
+                    wallpaperPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Pick wallpaper",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+
+            if (wallpaperUri != null) {
+                IOSHairlineDivider()
+
+                IOSSettingsRow(
+                    icon = Icons.Default.BlurOn,
+                    iconBgColor = Color(0xFF5AC8FA),
+                    title = "Blur Wallpaper",
+                    subtitle = "Soft blur for better readability",
+                    trailingContent = {
+                        Switch(
+                            checked = isWallpaperBlurEnabled,
+                            onCheckedChange = onUpdateWallpaperBlur
+                        )
+                    }
                 )
-            },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Pick wallpaper",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp)
+
+                IOSHairlineDivider()
+
+                IOSSettingsRow(
+                    icon = Icons.Default.Delete,
+                    iconBgColor = Color(0xFFFF3B30),
+                    title = "Remove Wallpaper",
+                    subtitle = "Reset to default background",
+                    titleColor = MaterialTheme.colorScheme.error,
+                    onClick = { onUpdateWallpaperUri(null) }
                 )
             }
-        )
+        }
+    }
 
-        if (wallpaperUri != null) {
-            IOSHairlineDivider()
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
+    // Card 6: Custom Home Icon
+    item {
+        IOSCardGroup(
+            header = "HOME ICON",
+            footer = "Customize the main icon displayed on your home page with a cropped 1:1 image."
+        ) {
             IOSSettingsRow(
-                icon = Icons.Default.BlurOn,
-                iconBgColor = Color(0xFF5AC8FA),
-                title = "Blur Wallpaper",
-                subtitle = "Soft blur for better readability",
+                icon = Icons.Default.Image,
+                iconBgColor = Color(0xFFAF52DE),
+                title = "Custom Home Icon",
+                subtitle = if (homeIconUri != null) "Custom icon set" else "Using default Aura logo",
+                onClick = {
+                    homeIconPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Pick custom icon",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+
+            if (homeIconUri != null) {
+                IOSHairlineDivider()
+
+                IOSSettingsRow(
+                    icon = Icons.Default.RestartAlt,
+                    iconBgColor = Color(0xFFFF3B30),
+                    title = "Reset to Default Icon",
+                    subtitle = "Remove custom icon",
+                    titleColor = MaterialTheme.colorScheme.error,
+                    onClick = { onUpdateHomeIconUri(null) }
+                )
+            }
+        }
+
+        pendingCropBitmap?.let { bitmap ->
+            ImageCropDialog(
+                sourceBitmap = bitmap,
+                onConfirm = { croppedBitmap ->
+                    val savedPath = saveCroppedIconToInternalStorage(context, croppedBitmap)
+                    onUpdateHomeIconUri(savedPath)
+                    onPendingCropBitmapChange(null)
+                },
+                onDismiss = { onPendingCropBitmapChange(null) }
+            )
+        }
+    }
+
+    item { Spacer(modifier = Modifier.height(20.dp)) }
+
+    // Card 7: Home Screen Widgets
+    item {
+        IOSCardGroup(
+            header = "HOME SCREEN WIDGETS",
+            footer = "Choose which sections to display on your new tab home page."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Dashboard,
+                iconBgColor = Color(0xFF007AFF),
+                title = "Speed Dial Shortcuts",
+                subtitle = "Show favorite site quick launch icons",
                 trailingContent = {
                     Switch(
-                        checked = isWallpaperBlurEnabled,
-                        onCheckedChange = onUpdateWallpaperBlur
+                        checked = showShortcuts,
+                        onCheckedChange = onToggleShowShortcuts
                     )
                 }
             )
@@ -817,247 +950,115 @@ private fun AppearanceTabContent(
             IOSHairlineDivider()
 
             IOSSettingsRow(
-                icon = Icons.Default.Delete,
-                iconBgColor = Color(0xFFFF3B30),
-                title = "Remove Wallpaper",
-                subtitle = "Reset to default background",
-                titleColor = MaterialTheme.colorScheme.error,
-                onClick = { onUpdateWallpaperUri(null) }
+                icon = Icons.Default.History,
+                iconBgColor = Color(0xFFFF9500),
+                title = "Recent Browsing History",
+                subtitle = "Show recent pages on home screen",
+                trailingContent = {
+                    Switch(
+                        checked = showRecentHistory,
+                        onCheckedChange = onToggleShowRecentHistory
+                    )
+                }
             )
         }
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    // Card 6: Custom Home Icon
-    IOSCardGroup(
-        header = "HOME ICON",
-        footer = "Customize the main icon displayed on your home page with a cropped 1:1 image."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Image,
-            iconBgColor = Color(0xFFAF52DE),
-            title = "Custom Home Icon",
-            subtitle = if (homeIconUri != null) "Custom icon set" else "Using default Aura logo",
-            onClick = {
-                homeIconPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
-            },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Pick custom icon",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        )
-
-        if (homeIconUri != null) {
-            IOSHairlineDivider()
-
-            IOSSettingsRow(
-                icon = Icons.Default.RestartAlt,
-                iconBgColor = Color(0xFFFF3B30),
-                title = "Reset to Default Icon",
-                subtitle = "Remove custom icon",
-                titleColor = MaterialTheme.colorScheme.error,
-                onClick = { onUpdateHomeIconUri(null) }
-            )
-        }
-    }
-
-    pendingCropBitmap?.let { bitmap ->
-        ImageCropDialog(
-            sourceBitmap = bitmap,
-            onConfirm = { croppedBitmap ->
-                val savedPath = saveCroppedIconToInternalStorage(context, croppedBitmap)
-                onUpdateHomeIconUri(savedPath)
-                pendingCropBitmap = null
-            },
-            onDismiss = { pendingCropBitmap = null }
-        )
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    // Card 6: Home Screen Widgets
-    IOSCardGroup(
-        header = "HOME SCREEN WIDGETS",
-        footer = "Choose which sections to display on your new tab home page."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Dashboard,
-            iconBgColor = Color(0xFF007AFF),
-            title = "Speed Dial Shortcuts",
-            subtitle = "Show favorite site quick launch icons",
-            trailingContent = {
-                Switch(
-                    checked = showShortcuts,
-                    onCheckedChange = onToggleShowShortcuts
-                )
-            }
-        )
-
-        IOSHairlineDivider()
-
-        IOSSettingsRow(
-            icon = Icons.Default.History,
-            iconBgColor = Color(0xFFFF9500),
-            title = "Recent Browsing History",
-            subtitle = "Show recent pages on home screen",
-            trailingContent = {
-                Switch(
-                    checked = showRecentHistory,
-                    onCheckedChange = onToggleShowRecentHistory
-                )
-            }
-        )
     }
 }
 
-@Composable
-private fun BrowserTabContent(
+private fun LazyListScope.browserTabContent(
     isDesktopModeDefault: Boolean,
     onToggleDesktopDefault: (Boolean) -> Unit,
     isJavaScriptEnabled: Boolean,
-    onToggleJavaScript: (Boolean) -> Unit
+    onToggleJavaScript: (Boolean) -> Unit,
+    uriHandler: androidx.compose.ui.platform.UriHandler
 ) {
-    val uriHandler = LocalUriHandler.current
-
     // Card 1: Web Engine
-    IOSCardGroup(
-        header = "WEB ENGINE",
-        footer = "Configure how embedded web pages are rendered."
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Laptop,
-            iconBgColor = Color(0xFF5856D6), // iOS System Indigo
-            title = "Desktop Site by Default",
-            subtitle = "Always request full desktop pages",
-            trailingContent = {
-                Switch(
-                    checked = isDesktopModeDefault,
-                    onCheckedChange = onToggleDesktopDefault
-                )
-            }
-        )
+    item {
+        IOSCardGroup(
+            header = "WEB ENGINE",
+            footer = "Configure how embedded web pages are rendered."
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Laptop,
+                iconBgColor = Color(0xFF5856D6), // iOS System Indigo
+                title = "Desktop Site by Default",
+                subtitle = "Always request full desktop pages",
+                trailingContent = {
+                    Switch(
+                        checked = isDesktopModeDefault,
+                        onCheckedChange = onToggleDesktopDefault
+                    )
+                }
+            )
 
-        IOSHairlineDivider()
+            IOSHairlineDivider()
 
-        IOSSettingsRow(
-            icon = Icons.Default.Code,
-            iconBgColor = Color(0xFFFF9500), // iOS System Orange
-            title = "Enable JavaScript",
-            subtitle = "Required for modern web features",
-            trailingContent = {
-                Switch(
-                    checked = isJavaScriptEnabled,
-                    onCheckedChange = onToggleJavaScript
-                )
-            }
-        )
+            IOSSettingsRow(
+                icon = Icons.Default.Code,
+                iconBgColor = Color(0xFFFF9500), // iOS System Orange
+                title = "Enable JavaScript",
+                subtitle = "Required for modern web features",
+                trailingContent = {
+                    Switch(
+                        checked = isJavaScriptEnabled,
+                        onCheckedChange = onToggleJavaScript
+                    )
+                }
+            )
+        }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    item { Spacer(modifier = Modifier.height(20.dp)) }
 
     // Card 2: About
-    IOSCardGroup(
-        header = "ABOUT"
-    ) {
-        IOSSettingsRow(
-            icon = Icons.Default.Info,
-            iconBgColor = Color(0xFF8E8E93), // iOS System Gray
-            title = "Aura Browser",
-            subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            trailingContent = {
-                Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        )
-
-        IOSHairlineDivider()
-
-        IOSSettingsRow(
-            icon = Icons.Default.Person,
-            iconBgColor = Color(0xFF34C759), // iOS System Green
-            title = "Created by aryaxzell",
-            subtitle = "github.com/aryaxzell",
-            onClick = {
-                try {
-                    uriHandler.openUri("https://github.com/aryaxzell")
-                } catch (e: Exception) {
-                    // Fallback if no external browser/handler
+    item {
+        IOSCardGroup(
+            header = "ABOUT"
+        ) {
+            IOSSettingsRow(
+                icon = Icons.Default.Info,
+                iconBgColor = Color(0xFF8E8E93), // iOS System Gray
+                title = "Aura Browser",
+                subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                trailingContent = {
+                    Text(
+                        text = "v${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = "Open GitHub profile",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        )
+            )
+
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.Person,
+                iconBgColor = Color(0xFF34C759), // iOS System Green
+                title = "Created by aryaxzell",
+                subtitle = "github.com/aryaxzell",
+                onClick = {
+                    try {
+                        uriHandler.openUri("https://github.com/aryaxzell")
+                    } catch (e: Exception) {
+                        // Fallback if no external browser/handler
+                    }
+                },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = "Open GitHub profile",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
     }
 }
 
 // -------------------------------------------------------------
 // REUSABLE iOS-STYLE COMPONENTS
 // -------------------------------------------------------------
-
-@Composable
-private fun IOSSegmentedControl(
-    tabs: List<String>,
-    selectedIndex: Int,
-    onTabSelected: (Int) -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(38.dp),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            tabs.forEachIndexed { index, title ->
-                val isSelected = selectedIndex == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
-                        )
-                        .clickable { onTabSelected(index) }
-                        .padding(horizontal = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            fontSize = 13.sp
-                        ),
-                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun IOSCardGroup(

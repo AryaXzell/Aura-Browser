@@ -9,13 +9,17 @@ import android.webkit.WebView
  * on low-memory devices (such as 2-3 GB RAM devices).
  */
 class WebViewPoolManager {
-    companion object {
-        // Can be adjusted to 2-3 for ultra-constrained memory devices
-        const val MAX_LIVE_WEBVIEWS = 4
-    }
-
     private val pool = mutableMapOf<String, WebView>()
     private val lastAccessedMap = mutableMapOf<String, Long>()
+
+    private fun getMaxLiveWebviews(context: Context): Int {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        return if (am != null && am.isLowRamDevice) {
+            2 // Keep only 2 active WebViews in memory on low-RAM devices to avoid background termination
+        } else {
+            4 // Allow up to 4 active WebViews on standard devices
+        }
+    }
 
     fun prewarmWebView(context: Context) {
         // Post to Main Thread Looper as an IdleHandler to run ONLY after the main UI thread is completely idle (first frame drawn)
@@ -40,8 +44,9 @@ class WebViewPoolManager {
             return existing
         }
 
+        val maxLimit = getMaxLiveWebviews(context)
         // LRU Eviction if pool reaches limit
-        if (pool.size >= MAX_LIVE_WEBVIEWS) {
+        if (pool.size >= maxLimit) {
             val lruEntry = lastAccessedMap
                 .filter { it.key != tabId && pool.containsKey(it.key) }
                 .minByOrNull { it.value }

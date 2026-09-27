@@ -120,6 +120,9 @@ class MainActivity : ComponentActivity() {
         // Pre-warm the WebView pool asynchronously during idle state to reduce tab creation latency by 500ms on low-end devices
         viewModel.webViewPoolManager.prewarmWebView(this)
 
+        // Initialize static assets MemoryCache with activity context to dynamically tune size based on RAM constraints
+        com.aryaxzell.aurabrowser.data.cache.MemoryCache.initialize(this)
+
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
@@ -212,8 +215,11 @@ fun BrowserApp(
     val webAction by viewModel.webAction.collectAsStateWithLifecycle()
     val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
-    val isBookmarked = remember(activeTab.url, bookmarks) {
-        activeTab.url.isNotBlank() && bookmarks.any { it.url == activeTab.url }
+    val bookmarkedUrls = remember(bookmarks) {
+        bookmarks.map { it.url }.toSet()
+    }
+    val isBookmarked = remember(activeTab.url, bookmarkedUrls) {
+        activeTab.url.isNotBlank() && bookmarkedUrls.contains(activeTab.url)
     }
 
     Scaffold(

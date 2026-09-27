@@ -202,7 +202,7 @@ fun DownloadsView(
             Spacer(modifier = Modifier.height(10.dp))
 
             // iOS-style Segmented Tab selector for Filter
-            DownloadsSegmentedControl(
+            SegmentedControl(
                 tabs = tabs,
                 selectedIndex = selectedTab,
                 onTabSelected = { selectedTab = it }
@@ -268,7 +268,7 @@ fun DownloadsTabContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        DownloadsSegmentedControl(
+        SegmentedControl(
             tabs = tabs,
             selectedIndex = selectedTab,
             onTabSelected = { selectedTab = it }
@@ -282,53 +282,6 @@ fun DownloadsTabContent(
             onDeleteDownload = onDeleteDownload,
             modifier = Modifier.fillMaxSize()
         )
-    }
-}
-
-@Composable
-private fun DownloadsSegmentedControl(
-    tabs: List<String>,
-    selectedIndex: Int,
-    onTabSelected: (Int) -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(38.dp),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            tabs.forEachIndexed { index, title ->
-                val isSelected = selectedIndex == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
-                        .clickable { onTabSelected(index) }
-                        .padding(horizontal = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            fontSize = 13.sp
-                        ),
-                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
     }
 }
 

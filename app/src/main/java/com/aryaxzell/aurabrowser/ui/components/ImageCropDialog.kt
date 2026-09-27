@@ -24,7 +24,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +54,8 @@ fun ImageCropDialog(
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val imageBitmap = remember(sourceBitmap) { sourceBitmap.asImageBitmap() }
+    val coroutineScope = rememberCoroutineScope()
+    var isCropping by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -76,10 +82,19 @@ fun ImageCropDialog(
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    IconButton(onClick = {
-                        val cropped = performCrop(sourceBitmap, scale, offset)
-                        onConfirm(cropped)
-                    }) {
+                    IconButton(
+                        enabled = !isCropping,
+                        onClick = {
+                            isCropping = true
+                            coroutineScope.launch(Dispatchers.Default) {
+                                val cropped = performCrop(sourceBitmap, scale, offset)
+                                withContext(Dispatchers.Main) {
+                                    isCropping = false
+                                    onConfirm(cropped)
+                                }
+                            }
+                        }
+                    ) {
                         Icon(Icons.Default.Check, contentDescription = "Confirm", tint = Color.White)
                     }
                 }

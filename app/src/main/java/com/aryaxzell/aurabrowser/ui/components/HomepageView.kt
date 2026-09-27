@@ -224,92 +224,98 @@ fun HomepageView(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Quick Action Chips (Bookmarks, History, Downloads)
-        Row(
+        LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Bookmarks Quick Button
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onOpenBookmarks() }
-                    .testTag("home_quick_bookmarks"),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            item {
+                // Bookmarks Quick Button
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onOpenBookmarks() }
+                        .testTag("home_quick_bookmarks"),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = "Bookmarks",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Bookmarks",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Bookmarks",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Bookmarks",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            // History Quick Button
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onOpenHistory() }
-                    .testTag("home_quick_history"),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            item {
+                // History Quick Button
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onOpenHistory() }
+                        .testTag("home_quick_history"),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = "History",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "History",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "History",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "History",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            // Downloads Quick Button
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onOpenDownloads() }
-                    .testTag("home_quick_downloads"),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            item {
+                // Downloads Quick Button
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onOpenDownloads() }
+                        .testTag("home_quick_downloads"),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Downloads",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Downloads",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Downloads",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Downloads",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }
@@ -626,15 +632,20 @@ private fun ShortcutBubble(
     faviconBase64: String? = null,
     onClick: () -> Unit
 ) {
-    val faviconBitmap = remember(faviconBase64) {
-        faviconBase64?.let {
-            try {
-                val bytes = android.util.Base64.decode(it, android.util.Base64.NO_WRAP)
-                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    ?.asImageBitmap()
-            } catch (e: Exception) {
-                null
+    val faviconBitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, key1 = faviconBase64) {
+        if (faviconBase64 != null) {
+            val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                try {
+                    val bytes = android.util.Base64.decode(faviconBase64, android.util.Base64.NO_WRAP)
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        ?.asImageBitmap()
+                } catch (e: Exception) {
+                    null
+                }
             }
+            value = bitmap
+        } else {
+            value = null
         }
     }
 
@@ -652,9 +663,10 @@ private fun ShortcutBubble(
                 .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            if (faviconBitmap != null) {
+            val bitmap = faviconBitmap
+            if (bitmap != null) {
                 Image(
-                    bitmap = faviconBitmap,
+                    bitmap = bitmap,
                     contentDescription = null,
                     modifier = Modifier
                         .size(28.dp)
@@ -686,27 +698,110 @@ private fun ShortcutBubble(
     }
 }
 
+private fun boxBlur(bitmap: Bitmap, radius: Int): Bitmap {
+    val w = bitmap.width
+    val h = bitmap.height
+    val pix = IntArray(w * h)
+    bitmap.getPixels(pix, 0, w, 0, 0, w, h)
+
+    val wm = w - 1
+    val hm = h - 1
+    val wh = w * h
+    val div = radius + radius + 1
+
+    val r = IntArray(wh)
+    val g = IntArray(wh)
+    val b = IntArray(wh)
+    var rsum: Int
+    var gsum: Int
+    var bsum: Int
+    var x: Int
+    var y: Int
+    var i: Int
+    var p: Int
+    var yp: Int
+    var yi: Int
+    var yw: Int
+
+    val vmin = IntArray(maxOf(w, h))
+    val dv = IntArray(256 * div)
+    for (i in 0 until 256 * div) {
+        dv[i] = i / div
+    }
+
+    yw = 0
+    yi = 0
+
+    for (y in 0 until h) {
+        rsum = 0
+        gsum = 0
+        bsum = 0
+        for (i in -radius..radius) {
+            p = pix[yi + minOf(wm, maxOf(i, 0))]
+            rsum += p shr 16 and 0xff
+            gsum += p shr 8 and 0xff
+            bsum += p and 0xff
+        }
+        for (x in 0 until w) {
+            r[yi] = dv[rsum]
+            g[yi] = dv[gsum]
+            b[yi] = dv[bsum]
+
+            if (y == 0) {
+                vmin[x] = minOf(x + radius + 1, wm)
+            }
+            val p1 = pix[yw + vmin[x]]
+            val p2 = pix[yw + maxOf(x - radius, 0)]
+
+            rsum += (p1 shr 16 and 0xff) - (p2 shr 16 and 0xff)
+            gsum += (p1 shr 8 and 0xff) - (p2 shr 8 and 0xff)
+            bsum += (p1 and 0xff) - (p2 and 0xff)
+            yi++
+        }
+        yw += w
+    }
+
+    for (x in 0 until w) {
+        rsum = 0
+        gsum = 0
+        bsum = 0
+        yp = -radius * w
+        for (i in -radius..radius) {
+            yi = maxOf(0, yp) + x
+            rsum += r[yi]
+            gsum += g[yi]
+            bsum += b[yi]
+            yp += w
+        }
+        yi = x
+        for (y in 0 until h) {
+            pix[yi] = (-0x1000000 and pix[yi]) or (dv[rsum] shl 16) or (dv[gsum] shl 8) or dv[bsum]
+            if (x == 0) {
+                vmin[y] = minOf(y + radius + 1, hm) * w
+            }
+            val p1 = x + vmin[y]
+            val p2 = x + maxOf(y - radius, 0) * w
+
+            rsum += r[p1] - r[p2]
+            gsum += g[p1] - g[p2]
+            bsum += b[p1] - b[p2]
+
+            yi += w
+        }
+    }
+
+    val outBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    outBitmap.setPixels(pix, 0, w, 0, 0, w, h)
+    return outBitmap
+}
+
 private fun applyStaticBlur(bitmap: Bitmap, context: Context): Bitmap {
     val scaledWidth = (bitmap.width / 4).coerceAtLeast(1)
     val scaledHeight = (bitmap.height / 4).coerceAtLeast(1)
     val scaled = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
-    val output = scaled.copy(Bitmap.Config.ARGB_8888, true)
     return try {
-        @Suppress("DEPRECATION")
-        val renderScriptBlur = android.renderscript.RenderScript.create(context)
-        @Suppress("DEPRECATION")
-        val input = android.renderscript.Allocation.createFromBitmap(renderScriptBlur, output)
-        @Suppress("DEPRECATION")
-        val outputAlloc = android.renderscript.Allocation.createFromBitmap(renderScriptBlur, output)
-        @Suppress("DEPRECATION")
-        val script = android.renderscript.ScriptIntrinsicBlur.create(renderScriptBlur, android.renderscript.Element.U8_4(renderScriptBlur))
-        script.setRadius(16f)
-        script.setInput(input)
-        script.forEach(outputAlloc)
-        outputAlloc.copyTo(output)
-        @Suppress("DEPRECATION")
-        renderScriptBlur.destroy()
-        Bitmap.createScaledBitmap(output, bitmap.width, bitmap.height, true)
+        val blurred = boxBlur(scaled, 12)
+        Bitmap.createScaledBitmap(blurred, bitmap.width, bitmap.height, true)
     } catch (e: Exception) {
         bitmap
     }

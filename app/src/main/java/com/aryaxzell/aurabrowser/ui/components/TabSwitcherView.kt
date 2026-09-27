@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -143,7 +144,7 @@ fun TabSwitcherView(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp),
+                        .heightIn(min = 180.dp, max = 460.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -168,7 +169,7 @@ fun TabSwitcherView(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp),
+                        .heightIn(min = 180.dp, max = 460.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -225,7 +226,7 @@ fun TabSwitcherView(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp)
+                        .heightIn(min = 180.dp, max = 460.dp)
                 ) {
                     items(tabs, key = { it.id }) { tab ->
                         val isActive = tab.id == activeTabId
