@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import com.aryaxzell.aurabrowser.ui.icons.*
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.Context

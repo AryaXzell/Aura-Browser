@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import com.aryaxzell.aurabrowser.ui.icons.*
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

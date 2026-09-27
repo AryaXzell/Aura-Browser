@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import com.aryaxzell.aurabrowser.ui.icons.*
 import androidx.activity.compose.BackHandler
 import android.content.Context
 import android.content.Intent

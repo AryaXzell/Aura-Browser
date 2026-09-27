@@ -1,5 +1,6 @@
 package com.aryaxzell.aurabrowser.ui.components
 
+import com.aryaxzell.aurabrowser.ui.icons.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
