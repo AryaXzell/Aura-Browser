@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
             val shouldShowOnboarding = remember(lastSeenVersionCode) {
                 (lastSeenVersionCode == 0) || (
                     lastSeenVersionCode < BuildConfig.VERSION_CODE &&
-                    WhatsNewData.entries.any { it.minVersionCode > lastSeenVersionCode }
+                    WhatsNewData.entries.any { it.minVersionCode > lastSeenVersionCode && it.minVersionCode <= BuildConfig.VERSION_CODE }
                 )
             }
 

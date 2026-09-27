@@ -72,12 +72,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.aryaxzell.aurabrowser.BuildConfig
 import com.aryaxzell.aurabrowser.data.model.WhatsNewData
 import com.aryaxzell.aurabrowser.data.model.WhatsNewEntry
 
 @Composable
 fun OnboardingView(
     lastSeenVersionCode: Int,
+    currentVersionCode: Int = BuildConfig.VERSION_CODE,
     currentThemeMode: String,
     currentAccentColor: String,
     onSelectThemeMode: (String) -> Unit,
@@ -88,8 +90,10 @@ fun OnboardingView(
     val context = LocalContext.current
     val isWhatsNewOnly = remember(lastSeenVersionCode) { lastSeenVersionCode > 0 }
 
-    val whatsNewList = remember(lastSeenVersionCode) {
-        WhatsNewData.entries.filter { it.minVersionCode > lastSeenVersionCode }
+    val whatsNewList = remember(lastSeenVersionCode, currentVersionCode) {
+        WhatsNewData.entries
+            .filter { it.minVersionCode > lastSeenVersionCode && it.minVersionCode <= currentVersionCode }
+            .sortedByDescending { it.minVersionCode }
     }
 
     // Dynamic steps setup
