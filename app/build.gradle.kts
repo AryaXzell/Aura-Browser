@@ -1,15 +1,20 @@
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.util.Calendar
 import java.util.TimeZone
-import java.util.Locale
 
 fun generateVersionCode(): Int {
-    // Format: YYMMDDHH sebagai Int — menjamin nilai yang selalu naik seiring waktu,
-    // sekaligus tetap dalam batas aman Int (maksimum versionCode yang diizinkan Play Store
-    // adalah 2100000000 — format YYMMDDHH menghasilkan nilai jauh di bawah itu hingga tahun 2099).
-    val formatter = SimpleDateFormat("yyMMddHH", Locale.US)
-    formatter.timeZone = TimeZone.getTimeZone("UTC")
-    return formatter.format(Date()).toInt()
+    // Jumlah menit sejak 1 Jan 2024 00:00 UTC ditambahkan offset 100,000,000.
+    // Offset 100,000,000 memastikan versionCode baru (101M+) selalu lebih besar
+    // dari skema terdahulu (yyMMddHH, misal ~26M di tahun 2026) sehingga update APK tidak ditolak.
+    // Memberikan presisi per menit (mencegah bentrokan build di jam yang sama)
+    // dan tetap jauh di bawah batas Play Store (2,100,000,000) hingga tahun ~2099 (~140M).
+    val epochMillis = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        set(2024, Calendar.JANUARY, 1, 0, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    val nowMillis = System.currentTimeMillis()
+    val minutesSinceEpoch = ((nowMillis - epochMillis) / 60000L).toInt()
+    val baseOffset = 100_000_000
+    return baseOffset + minutesSinceEpoch
 }
 
 plugins {

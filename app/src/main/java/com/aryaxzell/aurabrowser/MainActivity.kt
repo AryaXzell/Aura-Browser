@@ -58,6 +58,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aryaxzell.aurabrowser.data.model.WhatsNewData
 import com.aryaxzell.aurabrowser.ui.components.AddShortcutDialog
 import com.aryaxzell.aurabrowser.ui.components.BookmarksView
 import com.aryaxzell.aurabrowser.ui.components.BrowserBottomBar
@@ -67,6 +68,7 @@ import com.aryaxzell.aurabrowser.ui.components.DownloadsTabContent
 import com.aryaxzell.aurabrowser.ui.components.DownloadsView
 import com.aryaxzell.aurabrowser.ui.components.HistoryView
 import com.aryaxzell.aurabrowser.ui.components.HomepageView
+import com.aryaxzell.aurabrowser.ui.components.OnboardingView
 import com.aryaxzell.aurabrowser.ui.components.SettingsView
 import com.aryaxzell.aurabrowser.ui.components.TabSwitcherView
 import com.aryaxzell.aurabrowser.ui.theme.MyApplicationTheme
@@ -126,10 +128,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+            val lastSeenVersionCode by viewModel.lastSeenOnboardingVersionCode.collectAsStateWithLifecycle()
+
             val isDarkTheme = when (themeMode) {
                 "dark" -> true
                 "light" -> false
                 else -> isSystemInDarkTheme()
+            }
+
+            val shouldShowOnboarding = remember(lastSeenVersionCode) {
+                (lastSeenVersionCode == 0) || (
+                    lastSeenVersionCode < BuildConfig.VERSION_CODE &&
+                    WhatsNewData.entries.any { it.minVersionCode > lastSeenVersionCode }
+                )
             }
 
             // Sinkronkan warna ikon status bar & navigation bar dengan tema aktif
@@ -137,20 +148,38 @@ class MainActivity : ComponentActivity() {
                 val insetsController = WindowInsetsControllerCompat(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = !isDarkTheme
                 insetsController.isAppearanceLightNavigationBars = !isDarkTheme
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
             }
 
             MyApplicationTheme(
                 darkTheme = isDarkTheme,
                 accentColor = accentColor
             ) {
-                BrowserApp(
-                    viewModel = viewModel,
-                    onShowFileChooser = { intent, callback -> launchFileChooser(intent, callback) }
-                )
+                AnimatedContent(
+                    targetState = shouldShowOnboarding,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)))
+                            .togetherWith(fadeOut(animationSpec = tween(150)))
+                    },
+                    label = "onboarding_handoff_transition"
+                ) { showOnboarding ->
+                    if (showOnboarding) {
+                        OnboardingView(
+                            lastSeenVersionCode = lastSeenVersionCode,
+                            currentThemeMode = themeMode,
+                            currentAccentColor = accentColor,
+                            onSelectThemeMode = { viewModel.updateThemeMode(it) },
+                            onSelectAccentColor = { viewModel.updateAccentColor(it) },
+                            onCompleteOnboarding = {
+                                viewModel.updateLastSeenOnboardingVersionCode(BuildConfig.VERSION_CODE)
+                            }
+                        )
+                    } else {
+                        BrowserApp(
+                            viewModel = viewModel,
+                            onShowFileChooser = { intent, callback -> launchFileChooser(intent, callback) }
+                        )
+                    }
+                }
             }
         }
     }

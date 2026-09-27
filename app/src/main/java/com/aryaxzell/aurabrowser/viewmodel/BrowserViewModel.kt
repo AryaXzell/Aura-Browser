@@ -51,6 +51,11 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val isDesktopModeDefault: StateFlow<Boolean> = preferences.isDesktopModeDefaultFlow
     val isJavaScriptEnabled: StateFlow<Boolean> = preferences.isJavaScriptEnabledFlow
     val isDoNotTrackEnabled: StateFlow<Boolean> = preferences.isDoNotTrackEnabledFlow
+    val lastSeenOnboardingVersionCode: StateFlow<Int> = preferences.lastSeenOnboardingVersionCodeFlow
+
+    fun updateLastSeenOnboardingVersionCode(code: Int) {
+        preferences.lastSeenOnboardingVersionCode = code
+    }
 
     private val initialTab = TabItem(
         id = java.util.UUID.randomUUID().toString(),

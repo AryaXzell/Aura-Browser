@@ -33,7 +33,17 @@ class BrowserPreferences(context: Context) {
         private const val KEY_SHORTCUTS = "pref_shortcuts"
         private const val KEY_DNS_PROVIDER = "pref_dns_provider"
         private const val KEY_DNS_CUSTOM_VALUE = "pref_dns_custom_value"
+        private const val KEY_LAST_SEEN_ONBOARDING_VERSION_CODE = "pref_last_seen_onboarding_version_code"
     }
+
+    private val _lastSeenOnboardingVersionCode = MutableStateFlow(prefs.getInt(KEY_LAST_SEEN_ONBOARDING_VERSION_CODE, 0))
+    val lastSeenOnboardingVersionCodeFlow: StateFlow<Int> = _lastSeenOnboardingVersionCode.asStateFlow()
+    var lastSeenOnboardingVersionCode: Int
+        get() = _lastSeenOnboardingVersionCode.value
+        set(value) {
+            prefs.edit().putInt(KEY_LAST_SEEN_ONBOARDING_VERSION_CODE, value).apply()
+            _lastSeenOnboardingVersionCode.value = value
+        }
 
     private val _dnsProvider = MutableStateFlow(prefs.getString(KEY_DNS_PROVIDER, "system") ?: "system")
     val dnsProviderFlow: StateFlow<String> = _dnsProvider.asStateFlow()
