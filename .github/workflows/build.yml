@@ -39,16 +39,33 @@ jobs:
           echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
           echo "Debug keystore berhasil di-restore ke ~/.android/debug.keystore"
 
+      - name: Restore persistent release keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::Secret RELEASE_KEYSTORE_BASE64 belum di-set. Lihat dokumentasi PRD/generate-keystore.yml untuk langkah setup release keystore."
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > aura-browser-release.jks
+          echo "Release keystore berhasil di-restore ke aura-browser-release.jks"
+
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
-      - name: Assemble Split and Universal APKs
+      - name: Assemble Split and Universal Debug APKs
         run: ./gradlew assembleDebug -PsplitApks --no-daemon --stacktrace
 
-      - name: Upload ARM64 (64-bit) APK
+      - name: Assemble Split and Universal Release APKs
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease -PsplitApks --no-daemon --stacktrace
+
+      - name: Upload ARM64 (64-bit) Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: aura-browser-arm64-v8a
@@ -56,7 +73,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload ARM32 (32-bit) APK
+      - name: Upload ARM32 (32-bit) Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: aura-browser-armeabi-v7a-32bit
@@ -64,10 +81,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Universal APK
+      - name: Upload Universal Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: aura-browser-universal
           path: app/build/outputs/apk/debug/app-universal-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload ARM64 (64-bit) Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-arm64-v8a-release
+          path: app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload ARM32 (32-bit) Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-armeabi-v7a-32bit-release
+          path: app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Universal Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-browser-universal-release
+          path: app/build/outputs/apk/release/app-universal-release.apk
           if-no-files-found: error
           retention-days: 14
