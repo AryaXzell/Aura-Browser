@@ -64,8 +64,24 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val isLinkPreviewEnabled: StateFlow<Boolean> = preferences.isLinkPreviewEnabledFlow
     val appLanguage: StateFlow<com.aryaxzell.aurabrowser.data.model.AppLanguage> = preferences.appLanguageFlow
 
+    val translatorEngine: StateFlow<String> = preferences.translatorEngineFlow
+    val geminiApiKey: StateFlow<String> = preferences.geminiApiKeyFlow
+    val geminiModel: StateFlow<String> = preferences.geminiModelFlow
+
     fun updateAppLanguage(language: com.aryaxzell.aurabrowser.data.model.AppLanguage) {
         preferences.appLanguage = language
+    }
+
+    fun updateTranslatorEngine(engine: String) {
+        preferences.translatorEngine = engine
+    }
+
+    fun updateGeminiApiKey(key: String) {
+        preferences.geminiApiKey = key
+    }
+
+    fun updateGeminiModel(model: String) {
+        preferences.geminiModel = model
     }
 
     data class LinkPreviewTarget(
@@ -134,6 +150,9 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     private val _networkLogUpdateTrigger = MutableStateFlow(0L)
     val networkLogUpdateTrigger: StateFlow<Long> = _networkLogUpdateTrigger.asStateFlow()
 
+    private val _consoleLogUpdateTrigger = MutableStateFlow(0L)
+    val consoleLogUpdateTrigger: StateFlow<Long> = _consoleLogUpdateTrigger.asStateFlow()
+
     fun addNetworkLogEntry(tabId: String, entry: NetworkLogEntry) {
         val deque = networkLogBuffers.getOrPut(tabId) { java.util.ArrayDeque() }
         synchronized(deque) {
@@ -168,6 +187,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearConsoleLogs(tabId: String) {
         consoleLogBuffers[tabId]?.clear()
+        _consoleLogUpdateTrigger.value = System.currentTimeMillis()
     }
 
     private fun clearAllConsoleLogs() {
@@ -249,6 +269,13 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private val _showSettingsSheet = MutableStateFlow(false)
     val showSettingsSheet: StateFlow<Boolean> = _showSettingsSheet.asStateFlow()
+
+    private val _showTranslationSheet = MutableStateFlow(false)
+    val showTranslationSheet: StateFlow<Boolean> = _showTranslationSheet.asStateFlow()
+
+    fun setTranslationSheetVisible(visible: Boolean) {
+        _showTranslationSheet.value = visible
+    }
 
     private val _showDownloadsSheet = MutableStateFlow(false)
     val showDownloadsSheet: StateFlow<Boolean> = _showDownloadsSheet.asStateFlow()

@@ -49,6 +49,33 @@ class BrowserPreferences(context: Context) {
             _appLanguage.value = value
         }
 
+    private val _translatorEngine = MutableStateFlow(prefs.getString("pref_translator_engine", "google") ?: "google")
+    val translatorEngineFlow: StateFlow<String> = _translatorEngine.asStateFlow()
+    var translatorEngine: String
+        get() = _translatorEngine.value
+        set(value) {
+            prefs.edit().putString("pref_translator_engine", value).apply()
+            _translatorEngine.value = value
+        }
+
+    private val _geminiApiKey = MutableStateFlow(prefs.getString("pref_gemini_api_key", "") ?: "")
+    val geminiApiKeyFlow: StateFlow<String> = _geminiApiKey.asStateFlow()
+    var geminiApiKey: String
+        get() = _geminiApiKey.value
+        set(value) {
+            prefs.edit().putString("pref_gemini_api_key", value).apply()
+            _geminiApiKey.value = value
+        }
+
+    private val _geminiModel = MutableStateFlow(prefs.getString("pref_gemini_model", "gemini-2.5-flash") ?: "gemini-2.5-flash")
+    val geminiModelFlow: StateFlow<String> = _geminiModel.asStateFlow()
+    var geminiModel: String
+        get() = _geminiModel.value
+        set(value) {
+            prefs.edit().putString("pref_gemini_model", value).apply()
+            _geminiModel.value = value
+        }
+
     private fun loadAppLanguage(): com.aryaxzell.aurabrowser.data.model.AppLanguage {
         val saved = prefs.getString(KEY_APP_LANGUAGE, null)
         if (saved != null) {

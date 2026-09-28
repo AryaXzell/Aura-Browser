@@ -60,9 +60,9 @@ class AppStrings(val language: AppLanguage) {
     }
 
     val finishButton: String = when (language) {
-        AppLanguage.ID -> "Selesai"
+        AppLanguage.ID -> "Mulai Menjelajah"
         AppLanguage.EN -> "Start Browsing"
-        AppLanguage.RU -> "Завершить"
+        AppLanguage.RU -> "Начать работу"
     }
 
     val whatsNew: String = when (language) {
@@ -95,13 +95,7 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.RU -> "Выберите оформление и акцентный цвет."
     }
 
-    // Settings
-    val settingsTitle: String = when (language) {
-        AppLanguage.ID -> "Pengaturan"
-        AppLanguage.EN -> "Settings"
-        AppLanguage.RU -> "Настройки"
-    }
-
+    // Common Actions
     val back: String = when (language) {
         AppLanguage.ID -> "Kembali"
         AppLanguage.EN -> "Back"
@@ -132,10 +126,35 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.RU -> "Отмена"
     }
 
+    val delete: String = when (language) {
+        AppLanguage.ID -> "Hapus"
+        AppLanguage.EN -> "Delete"
+        AppLanguage.RU -> "Удалить"
+    }
+
+    val close: String = when (language) {
+        AppLanguage.ID -> "Tutup"
+        AppLanguage.EN -> "Close"
+        AppLanguage.RU -> "Закрыть"
+    }
+
     val clearAll: String = when (language) {
         AppLanguage.ID -> "Hapus Semua"
         AppLanguage.EN -> "Clear All"
         AppLanguage.RU -> "Очистить всё"
+    }
+
+    val reload: String = when (language) {
+        AppLanguage.ID -> "Muat Ulang"
+        AppLanguage.EN -> "Reload"
+        AppLanguage.RU -> "Перезагрузить"
+    }
+
+    // Settings
+    val settingsTitle: String = when (language) {
+        AppLanguage.ID -> "Pengaturan"
+        AppLanguage.EN -> "Settings"
+        AppLanguage.RU -> "Настройки"
     }
 
     val tabGeneral: String = when (language) {
@@ -198,6 +217,84 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.RU -> "Имя отображается на главной странице браузера."
     }
 
+    val appearanceThemeHeader: String = when (language) {
+        AppLanguage.ID -> "TEMA & TAMPILAN"
+        AppLanguage.EN -> "THEME & APPEARANCE"
+        AppLanguage.RU -> "ТЕМА И ОФОРМЛЕНИЕ"
+    }
+
+    val themeFollowSystem: String = when (language) {
+        AppLanguage.ID -> "Ikuti Sistem"
+        AppLanguage.EN -> "Follow System"
+        AppLanguage.RU -> "Как в системе"
+    }
+
+    val themeLight: String = when (language) {
+        AppLanguage.ID -> "Terang"
+        AppLanguage.EN -> "Light"
+        AppLanguage.RU -> "Светлая"
+    }
+
+    val themeDark: String = when (language) {
+        AppLanguage.ID -> "Gelap"
+        AppLanguage.EN -> "Dark"
+        AppLanguage.RU -> "Тёмная"
+    }
+
+    val accentColorHeader: String = when (language) {
+        AppLanguage.ID -> "WARNA AKSEN"
+        AppLanguage.EN -> "ACCENT COLOR"
+        AppLanguage.RU -> "АКЦЕНТНЫЙ ЦВЕТ"
+    }
+
+    val tabSwitcherHeader: String = when (language) {
+        AppLanguage.ID -> "TAMPILAN PENGALIH TAB"
+        AppLanguage.EN -> "TAB SWITCHER LAYOUT"
+        AppLanguage.RU -> "ВИД ПЕРЕКЛЮЧАТЕЛЯ ВКЛАДОК"
+    }
+
+    val homeWidgetsHeader: String = when (language) {
+        AppLanguage.ID -> "WIDGET BERANDA"
+        AppLanguage.EN -> "HOMEPAGE WIDGETS"
+        AppLanguage.RU -> "ВИДЖЕТЫ НА ГЛАВНОЙ"
+    }
+
+    val showShortcutsSetting: String = when (language) {
+        AppLanguage.ID -> "Tampilkan Pintasan"
+        AppLanguage.EN -> "Show Shortcuts"
+        AppLanguage.RU -> "Показывать закладки"
+    }
+
+    val showRecentHistorySetting: String = when (language) {
+        AppLanguage.ID -> "Tampilkan Riwayat Terakhir"
+        AppLanguage.EN -> "Show Recent History"
+        AppLanguage.RU -> "Показывать недавнюю историю"
+    }
+
+    val wallpaperHeader: String = when (language) {
+        AppLanguage.ID -> "WALLPAPER BERANDA"
+        AppLanguage.EN -> "HOMEPAGE WALLPAPER"
+        AppLanguage.RU -> "ОБОИ ГЛАВНОЙ СТРАНИЦЫ"
+    }
+
+    val blurWallpaper: String = when (language) {
+        AppLanguage.ID -> "Efek Buram (Blur)"
+        AppLanguage.EN -> "Blur Wallpaper"
+        AppLanguage.RU -> "Размытие обоев"
+    }
+
+    val changeWallpaper: String = when (language) {
+        AppLanguage.ID -> "Pilih Foto Wallpaper"
+        AppLanguage.EN -> "Choose Wallpaper"
+        AppLanguage.RU -> "Выбрать обои"
+    }
+
+    val removeWallpaper: String = when (language) {
+        AppLanguage.ID -> "Hapus Wallpaper"
+        AppLanguage.EN -> "Remove Wallpaper"
+        AppLanguage.RU -> "Удалить обои"
+    }
+
     val contentProtectionHeader: String = when (language) {
         AppLanguage.ID -> "PERLINDUNGAN KONTEN & PRIVASI"
         AppLanguage.EN -> "CONTENT & PRIVACY PROTECTION"
@@ -256,6 +353,18 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.ID -> "Aktifkan JavaScript"
         AppLanguage.EN -> "Enable JavaScript"
         AppLanguage.RU -> "Включить JavaScript"
+    }
+
+    val developerMode: String = when (language) {
+        AppLanguage.ID -> "Mode Pengembang"
+        AppLanguage.EN -> "Developer Mode"
+        AppLanguage.RU -> "Режим разработчика"
+    }
+
+    val developerModeSubtitle: String = when (language) {
+        AppLanguage.ID -> "Aktifkan inspeksi konsol JS dan log jaringan"
+        AppLanguage.EN -> "Enables JS console and network inspection"
+        AppLanguage.RU -> "Включает консоль JS и сетевой журнал"
     }
 
     // Home screen
@@ -332,6 +441,24 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.RU -> "Загруженных файлов пока нет."
     }
 
+    val searchBookmarks: String = when (language) {
+        AppLanguage.ID -> "Cari markah..."
+        AppLanguage.EN -> "Search bookmarks..."
+        AppLanguage.RU -> "Поиск в закладках..."
+    }
+
+    val searchHistory: String = when (language) {
+        AppLanguage.ID -> "Cari riwayat..."
+        AppLanguage.EN -> "Search history..."
+        AppLanguage.RU -> "Поиск в истории..."
+    }
+
+    val searchDownloads: String = when (language) {
+        AppLanguage.ID -> "Cari unduhan..."
+        AppLanguage.EN -> "Search downloads..."
+        AppLanguage.RU -> "Поиск в загрузках..."
+    }
+
     // Top Bar & Menu Actions
     val newTab: String = when (language) {
         AppLanguage.ID -> "Tab Baru"
@@ -343,6 +470,18 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.ID -> "Tab Samaran Baru"
         AppLanguage.EN -> "New Incognito Tab"
         AppLanguage.RU -> "Новая вкладка инкогнито"
+    }
+
+    val addBookmark: String = when (language) {
+        AppLanguage.ID -> "Tambah Markah"
+        AppLanguage.EN -> "Add Bookmark"
+        AppLanguage.RU -> "Добавить закладку"
+    }
+
+    val removeBookmark: String = when (language) {
+        AppLanguage.ID -> "Hapus Markah"
+        AppLanguage.EN -> "Remove Bookmark"
+        AppLanguage.RU -> "Удалить закладку"
     }
 
     val desktopSite: String = when (language) {
@@ -361,6 +500,42 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.ID -> "Bagikan"
         AppLanguage.EN -> "Share"
         AppLanguage.RU -> "Поделиться"
+    }
+
+    val sharePage: String = when (language) {
+        AppLanguage.ID -> "Bagikan Halaman"
+        AppLanguage.EN -> "Share Page"
+        AppLanguage.RU -> "Поделиться страницей"
+    }
+
+    val moreOptions: String = when (language) {
+        AppLanguage.ID -> "Lainnya..."
+        AppLanguage.EN -> "More..."
+        AppLanguage.RU -> "Ещё..."
+    }
+
+    val developerTools: String = when (language) {
+        AppLanguage.ID -> "Alat Pengembang"
+        AppLanguage.EN -> "Developer Tools"
+        AppLanguage.RU -> "Инструменты разработчика"
+    }
+
+    val viewPageSource: String = when (language) {
+        AppLanguage.ID -> "Lihat Sumber Halaman"
+        AppLanguage.EN -> "View Page Source"
+        AppLanguage.RU -> "Исходный код страницы"
+    }
+
+    val networkLog: String = when (language) {
+        AppLanguage.ID -> "Log Jaringan"
+        AppLanguage.EN -> "Network Log"
+        AppLanguage.RU -> "Сетевой журнал"
+    }
+
+    val console: String = when (language) {
+        AppLanguage.ID -> "Konsol JavaScript"
+        AppLanguage.EN -> "JavaScript Console"
+        AppLanguage.RU -> "Консоль JavaScript"
     }
 
     val siteInfo: String = when (language) {
@@ -431,9 +606,9 @@ class AppStrings(val language: AppLanguage) {
     }
 
     val linkCopied: String = when (language) {
-        AppLanguage.ID -> "Tautan disalin"
-        AppLanguage.EN -> "Link copied"
-        AppLanguage.RU -> "Ссылка скопирована"
+        AppLanguage.ID -> "Tautan disalin ke papan klip"
+        AppLanguage.EN -> "Link copied to clipboard"
+        AppLanguage.RU -> "Ссылка скопирована в буфер"
     }
 
     val addedToBookmarksToast: String = when (language) {
@@ -446,5 +621,188 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.ID -> "Dihapus dari markah"
         AppLanguage.EN -> "Removed from bookmarks"
         AppLanguage.RU -> "Удалено из закладок"
+    }
+
+    // Developer / Tools Screens
+    val consoleTitle: String = when (language) {
+        AppLanguage.ID -> "Konsol JavaScript"
+        AppLanguage.EN -> "JavaScript Console"
+        AppLanguage.RU -> "Консоль JavaScript"
+    }
+
+    fun logsRecorded(count: Int): String = when (language) {
+        AppLanguage.ID -> "$count pesan log tercatat"
+        AppLanguage.EN -> "$count log messages recorded"
+        AppLanguage.RU -> "Записей журнала: $count"
+    }
+
+    val filterConsolePlaceholder: String = when (language) {
+        AppLanguage.ID -> "Saring pesan konsol..."
+        AppLanguage.EN -> "Filter console messages..."
+        AppLanguage.RU -> "Фильтр сообщений..."
+    }
+
+    val noConsoleLogs: String = when (language) {
+        AppLanguage.ID -> "Tidak ada pesan konsol"
+        AppLanguage.EN -> "No console messages"
+        AppLanguage.RU -> "Нет сообщений в консоли"
+    }
+
+    val clearLogs: String = when (language) {
+        AppLanguage.ID -> "Hapus Log"
+        AppLanguage.EN -> "Clear Logs"
+        AppLanguage.RU -> "Очистить журнал"
+    }
+
+    val copyLogs: String = when (language) {
+        AppLanguage.ID -> "Salin Log"
+        AppLanguage.EN -> "Copy Logs"
+        AppLanguage.RU -> "Скопировать журнал"
+    }
+
+    val networkLogTitle: String = when (language) {
+        AppLanguage.ID -> "Log Jaringan"
+        AppLanguage.EN -> "Network Log"
+        AppLanguage.RU -> "Сетевой журнал"
+    }
+
+    fun requestsRecorded(count: Int): String = when (language) {
+        AppLanguage.ID -> "$count permintaan tercatat"
+        AppLanguage.EN -> "$count requests recorded"
+        AppLanguage.RU -> "Запросов: $count"
+    }
+
+    val filterNetworkPlaceholder: String = when (language) {
+        AppLanguage.ID -> "Saring permintaan jaringan..."
+        AppLanguage.EN -> "Filter network requests..."
+        AppLanguage.RU -> "Фильтр запросов..."
+    }
+
+    val noNetworkLogs: String = when (language) {
+        AppLanguage.ID -> "Tidak ada permintaan jaringan"
+        AppLanguage.EN -> "No network requests"
+        AppLanguage.RU -> "Нет сетевых запросов"
+    }
+
+    val pageSourceTitle: String = when (language) {
+        AppLanguage.ID -> "Kode Sumber Halaman"
+        AppLanguage.EN -> "Page Source"
+        AppLanguage.RU -> "Исходный код страницы"
+    }
+
+    val wrapLines: String = when (language) {
+        AppLanguage.ID -> "Bungkus Baris"
+        AppLanguage.EN -> "Wrap Lines"
+        AppLanguage.RU -> "Перенос строк"
+    }
+
+    val copySource: String = when (language) {
+        AppLanguage.ID -> "Salin Sumber"
+        AppLanguage.EN -> "Copy Source"
+        AppLanguage.RU -> "Скопировать код"
+    }
+
+    // Add Shortcut Dialog
+    val addShortcut: String = when (language) {
+        AppLanguage.ID -> "Tambah Pintasan"
+        AppLanguage.EN -> "Add Shortcut"
+        AppLanguage.RU -> "Добавить ярлык"
+    }
+
+    val shortcutTitle: String = when (language) {
+        AppLanguage.ID -> "Nama Pintasan"
+        AppLanguage.EN -> "Shortcut Name"
+        AppLanguage.RU -> "Название ярлыка"
+    }
+
+    val shortcutUrl: String = when (language) {
+        AppLanguage.ID -> "Alamat URL"
+        AppLanguage.EN -> "URL Address"
+        AppLanguage.RU -> "Адрес URL"
+    }
+
+    // Tab Switcher
+    val closeAllTabs: String = when (language) {
+        AppLanguage.ID -> "Tutup Semua Tab"
+        AppLanguage.EN -> "Close All Tabs"
+        AppLanguage.RU -> "Закрыть все вкладки"
+    }
+
+    fun tabsCount(count: Int): String = when (language) {
+        AppLanguage.ID -> "$count Tab"
+        AppLanguage.EN -> "$count Tabs"
+        AppLanguage.RU -> "Вкладок: $count"
+    }
+
+    val incognito: String = when (language) {
+        AppLanguage.ID -> "Samaran"
+        AppLanguage.EN -> "Incognito"
+        AppLanguage.RU -> "Инкогнито"
+    }
+
+    val translate: String = when (language) {
+        AppLanguage.ID -> "Terjemahkan Halaman"
+        AppLanguage.EN -> "Translate Page"
+        AppLanguage.RU -> "Перевести страницу"
+    }
+
+    val translatorSettings: String = when (language) {
+        AppLanguage.ID -> "Pengaturan Penerjemah"
+        AppLanguage.EN -> "Translator Settings"
+        AppLanguage.RU -> "Настройки переводчика"
+    }
+
+    val translateFrom: String = when (language) {
+        AppLanguage.ID -> "Terjemahkan dari"
+        AppLanguage.EN -> "Translate from"
+        AppLanguage.RU -> "Перевести с"
+    }
+
+    val translateTo: String = when (language) {
+        AppLanguage.ID -> "Terjemahkan ke"
+        AppLanguage.EN -> "Translate to"
+        AppLanguage.RU -> "Перевести на"
+    }
+
+    val translating: String = when (language) {
+        AppLanguage.ID -> "Menerjemahkan..."
+        AppLanguage.EN -> "Translating..."
+        AppLanguage.RU -> "Перевод..."
+    }
+
+    val selectTranslatorEngine: String = when (language) {
+        AppLanguage.ID -> "Pilih Mesin Penerjemah"
+        AppLanguage.EN -> "Select Translator Engine"
+        AppLanguage.RU -> "Выберите переводчик"
+    }
+
+    val geminiApiKeyLabel: String = when (language) {
+        AppLanguage.ID -> "Kunci API Gemini"
+        AppLanguage.EN -> "Gemini API Key"
+        AppLanguage.RU -> "API-ключ Gemini"
+    }
+
+    val geminiApiKeyPlaceholder: String = when (language) {
+        AppLanguage.ID -> "Masukkan Kunci API Gemini..."
+        AppLanguage.EN -> "Enter Gemini API Key..."
+        AppLanguage.RU -> "Введите API-ключ Gemini..."
+    }
+
+    val geminiModelLabel: String = when (language) {
+        AppLanguage.ID -> "Model Gemini"
+        AppLanguage.EN -> "Gemini Model"
+        AppLanguage.RU -> "Модель Gemini"
+    }
+
+    val checkModels: String = when (language) {
+        AppLanguage.ID -> "Periksa Model"
+        AppLanguage.EN -> "Check Models"
+        AppLanguage.RU -> "Проверить модели"
+    }
+
+    val modelsAvailable: String = when (language) {
+        AppLanguage.ID -> "Daftar Model Tersedia"
+        AppLanguage.EN -> "Available Models List"
+        AppLanguage.RU -> "Список доступных моделей"
     }
 }

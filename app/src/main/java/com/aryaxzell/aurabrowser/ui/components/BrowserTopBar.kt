@@ -1,6 +1,14 @@
 package com.aryaxzell.aurabrowser.ui.components
 
 import com.aryaxzell.aurabrowser.ui.icons.*
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -115,6 +123,8 @@ fun BrowserTopBar(
     onOpenPageSource: () -> Unit = {},
     onOpenNetworkLog: () -> Unit = {},
     onOpenConsoleLog: () -> Unit = {},
+    onOpenTranslation: () -> Unit = {},
+    language: AppLanguage = AppLanguage.EN,
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -405,7 +415,9 @@ fun BrowserTopBar(
                         onShareUrl = onShareUrl,
                         onOpenPageSource = onOpenPageSource,
                         onOpenNetworkLog = onOpenNetworkLog,
-                        onOpenConsoleLog = onOpenConsoleLog
+                        onOpenConsoleLog = onOpenConsoleLog,
+                        onOpenTranslation = onOpenTranslation,
+                        language = language
                     )
                 }
             }
@@ -452,9 +464,18 @@ private fun TopBarMenu(
     onShareUrl: () -> Unit,
     onOpenPageSource: () -> Unit,
     onOpenNetworkLog: () -> Unit,
-    onOpenConsoleLog: () -> Unit
+    onOpenConsoleLog: () -> Unit,
+    onOpenTranslation: () -> Unit,
+    language: AppLanguage
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showPart2 by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expanded) {
+        if (!expanded) {
+            showPart2 = false
+        }
+    }
 
     Box {
         Surface(
@@ -484,7 +505,6 @@ private fun TopBarMenu(
             }
         }
 
-        // Proportional, smooth contextual dropdown menu
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -498,72 +518,30 @@ private fun TopBarMenu(
                 .width(220.dp)
                 .clip(RoundedCornerShape(16.dp))
         ) {
+            val strings = remember(language) { AppStrings(language) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
+                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
             ) {
-                if (!isHome) {
+                if (!showPart2) {
+                    // PART 1: Fitur Utama / Penting
                     IOSMenuItem(
-                        text = if (isBookmarked) "Remove Bookmark" else "Add Bookmark",
-                        icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        iconTint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = strings.newTab,
+                        icon = Icons.Default.Add,
                         onClick = {
                             expanded = false
-                            onToggleBookmark()
+                            onOpenNewTab(false)
                         }
                     )
+
                     IOSMenuItem(
-                        text = if (isDesktopMode) "Mobile Website" else "Desktop Website",
-                        icon = Icons.Default.Laptop,
+                        text = strings.newIncognitoTab,
+                        icon = Icons.Default.Shield,
                         onClick = {
                             expanded = false
-                            onToggleDesktop()
-                        }
-                    )
-                    IOSMenuItem(
-                        text = "Share Page",
-                        icon = Icons.Default.Share,
-                        onClick = {
-                            expanded = false
-                            onShareUrl()
-                        }
-                    )
-                    if (isHttpOrHttps) {
-                        IOSMenuItem(
-                            text = "View Page Source",
-                            icon = Icons.Default.Code,
-                            onClick = {
-                                expanded = false
-                                onOpenPageSource()
-                            }
-                        )
-                        IOSMenuItem(
-                            text = "Network Log",
-                            icon = Icons.Default.NetworkCheck,
-                            onClick = {
-                                expanded = false
-                                onOpenNetworkLog()
-                            }
-                        )
-                    }
-                    if (isDeveloperMode) {
-                        IOSMenuItem(
-                            text = "Console",
-                            icon = Icons.Default.Terminal,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = {
-                                expanded = false
-                                onOpenConsoleLog()
-                            }
-                        )
-                    }
-                    IOSMenuItem(
-                        text = "Reload",
-                        icon = Icons.Default.Refresh,
-                        onClick = {
-                            expanded = false
-                            onReload()
+                            onOpenNewTab(true)
                         }
                     )
 
@@ -572,73 +550,170 @@ private fun TopBarMenu(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                     )
+
+                    IOSMenuItem(
+                        text = strings.bookmarksTitle,
+                        icon = Icons.Default.Bookmarks,
+                        onClick = {
+                            expanded = false
+                            onOpenBookmarks()
+                        }
+                    )
+
+                    IOSMenuItem(
+                        text = strings.historyTitle,
+                        icon = Icons.Default.History,
+                        onClick = {
+                            expanded = false
+                            onOpenHistory()
+                        }
+                    )
+
+                    IOSMenuItem(
+                        text = strings.downloadsTitle,
+                        icon = Icons.Default.Download,
+                        onClick = {
+                            expanded = false
+                            onOpenDownloads()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+
+                    IOSMenuItem(
+                        text = strings.settingsTitle,
+                        icon = Icons.Default.Settings,
+                        onClick = {
+                            expanded = false
+                            onOpenSettings()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+
+                    IOSMenuItem(
+                        text = strings.moreOptions,
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            showPart2 = true
+                        }
+                    )
+                } else {
+                    // PART 2: Fitur Lainnya & Dev Tools
+                    IOSMenuItem(
+                        text = strings.back,
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            showPart2 = false
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+
+                    if (!isHome) {
+                        IOSMenuItem(
+                            text = if (isBookmarked) strings.removeBookmark else strings.addBookmark,
+                            icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            iconTint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = {
+                                expanded = false
+                                onToggleBookmark()
+                            }
+                        )
+
+                        IOSMenuItem(
+                            text = if (isDesktopMode) strings.mobileSite else strings.desktopSite,
+                            icon = Icons.Default.Laptop,
+                            onClick = {
+                                expanded = false
+                                onToggleDesktop()
+                            }
+                        )
+
+                        IOSMenuItem(
+                            text = strings.sharePage,
+                            icon = Icons.Default.Share,
+                            onClick = {
+                                expanded = false
+                                onShareUrl()
+                            }
+                        )
+
+                        // Translate Page Action
+                        IOSMenuItem(
+                            text = strings.translate,
+                            icon = Icons.Default.Translate,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = {
+                                expanded = false
+                                onOpenTranslation()
+                            }
+                        )
+
+                        if (isHttpOrHttps) {
+                            IOSMenuItem(
+                                text = strings.viewPageSource,
+                                icon = Icons.Default.Code,
+                                onClick = {
+                                    expanded = false
+                                    onOpenPageSource()
+                                }
+                            )
+                            IOSMenuItem(
+                                text = strings.networkLog,
+                                icon = Icons.Default.NetworkCheck,
+                                onClick = {
+                                    expanded = false
+                                    onOpenNetworkLog()
+                                }
+                            )
+                        }
+
+                        if (isDeveloperMode) {
+                            IOSMenuItem(
+                                text = strings.console,
+                                icon = Icons.Default.Terminal,
+                                iconTint = MaterialTheme.colorScheme.primary,
+                                onClick = {
+                                    expanded = false
+                                    onOpenConsoleLog()
+                                }
+                            )
+                        }
+
+                        IOSMenuItem(
+                            text = strings.reload,
+                            icon = Icons.Default.Refresh,
+                            onClick = {
+                                expanded = false
+                                onReload()
+                            }
+                        )
+                    } else {
+                        IOSMenuItem(
+                            text = strings.reload,
+                            icon = Icons.Default.Refresh,
+                            onClick = {
+                                expanded = false
+                                onReload()
+                            }
+                        )
+                    }
                 }
-
-                IOSMenuItem(
-                    text = "New Tab",
-                    icon = Icons.Default.Add,
-                    onClick = {
-                        expanded = false
-                        onOpenNewTab(false)
-                    }
-                )
-
-                IOSMenuItem(
-                    text = "New Incognito Tab",
-                    icon = Icons.Default.Shield,
-                    onClick = {
-                        expanded = false
-                        onOpenNewTab(true)
-                    }
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                )
-
-                IOSMenuItem(
-                    text = "Bookmarks",
-                    icon = Icons.Default.Bookmarks,
-                    onClick = {
-                        expanded = false
-                        onOpenBookmarks()
-                    }
-                )
-
-                IOSMenuItem(
-                    text = "History",
-                    icon = Icons.Default.History,
-                    onClick = {
-                        expanded = false
-                        onOpenHistory()
-                    }
-                )
-
-                IOSMenuItem(
-                    text = "Downloads",
-                    icon = Icons.Default.Download,
-                    onClick = {
-                        expanded = false
-                        onOpenDownloads()
-                    }
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                )
-
-                IOSMenuItem(
-                    text = "Settings",
-                    icon = Icons.Default.Settings,
-                    onClick = {
-                        expanded = false
-                        onOpenSettings()
-                    }
-                )
             }
         }
     }

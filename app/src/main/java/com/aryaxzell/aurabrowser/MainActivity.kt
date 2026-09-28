@@ -16,9 +16,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.EaseInOutQuart
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -119,7 +123,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            splashScreenViewProvider.remove()
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -130,8 +137,11 @@ class MainActivity : ComponentActivity() {
         // Pre-warm the WebView pool asynchronously during idle state to reduce tab creation latency by 500ms on low-end devices
         viewModel.webViewPoolManager.prewarmWebView(this)
 
-        // Initialize static assets MemoryCache with activity context to dynamically tune size based on RAM constraints
-        com.aryaxzell.aurabrowser.data.cache.MemoryCache.initialize(this)
+        // Initialize static assets MemoryCache asynchronously on idle to keep onCreate under 2ms
+        android.os.Looper.myQueue().addIdleHandler {
+            com.aryaxzell.aurabrowser.data.cache.MemoryCache.initialize(this)
+            false
+        }
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -166,8 +176,15 @@ class MainActivity : ComponentActivity() {
                 AnimatedContent(
                     targetState = shouldShowOnboarding,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)))
-                            .togetherWith(fadeOut(animationSpec = tween(150)))
+                        if (targetState) {
+                            // Reset: showing onboarding
+                            (slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = EaseInOutQuart)) + fadeIn(animationSpec = tween(500)))
+                                .togetherWith(slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(500, easing = EaseInOutQuart)) + fadeOut(animationSpec = tween(500)))
+                        } else {
+                            // Onboarding complete -> entering BrowserApp
+                            (slideInHorizontally(initialOffsetX = { it }, animationSpec = spring(dampingRatio = 0.72f, stiffness = 220f)) + fadeIn(animationSpec = tween(400)))
+                                .togetherWith(slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(500, easing = EaseInOutQuart)) + scaleOut(targetScale = 0.92f, animationSpec = tween(500)) + fadeOut(animationSpec = tween(400)))
+                        }
                     },
                     label = "onboarding_handoff_transition"
                 ) { showOnboarding ->
@@ -259,7 +276,13 @@ fun BrowserApp(
     val showHistorySheet by viewModel.showHistorySheet.collectAsStateWithLifecycle()
     val showDownloadsSheet by viewModel.showDownloadsSheet.collectAsStateWithLifecycle()
     val showSettingsSheet by viewModel.showSettingsSheet.collectAsStateWithLifecycle()
+    val showTranslationSheet by viewModel.showTranslationSheet.collectAsStateWithLifecycle()
     val showAddShortcutDialog by viewModel.showAddShortcutDialog.collectAsStateWithLifecycle()
+
+    val translatorEngine by viewModel.translatorEngine.collectAsStateWithLifecycle()
+    val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val geminiModel by viewModel.geminiModel.collectAsStateWithLifecycle()
+    val consoleLogTrigger by viewModel.consoleLogUpdateTrigger.collectAsStateWithLifecycle()
 
     val showSiteInfoSheet by viewModel.showSiteInfoSheet.collectAsStateWithLifecycle()
     val showPageSourceView by viewModel.showPageSourceView.collectAsStateWithLifecycle()
@@ -319,7 +342,9 @@ fun BrowserApp(
                 onOpenSiteInfo = { viewModel.setShowSiteInfoSheet(true) },
                 onOpenPageSource = { viewModel.setShowPageSourceView(true) },
                 onOpenNetworkLog = { viewModel.setShowNetworkLogView(true) },
-                onOpenConsoleLog = { viewModel.setShowConsoleLogView(true) }
+                onOpenConsoleLog = { viewModel.setShowConsoleLogView(true) },
+                onOpenTranslation = { viewModel.setTranslationSheetVisible(true) },
+                language = appLanguage
             )
         },
         bottomBar = {
@@ -739,9 +764,42 @@ fun BrowserApp(
     // Console Log View
     if (showConsoleLogView) {
         ConsoleLogView(
-            logs = remember(activeTab.id) { viewModel.getConsoleLogs(activeTab.id) },
+            logs = remember(activeTab.id, consoleLogTrigger) { viewModel.getConsoleLogs(activeTab.id) },
             onClearLogs = { viewModel.clearConsoleLogs(activeTab.id) },
             onDismiss = { viewModel.setShowConsoleLogView(false) }
+        )
+    }
+
+    // Translation Sheet View
+    if (showTranslationSheet) {
+        com.aryaxzell.aurabrowser.ui.components.TranslationView(
+            currentLanguage = appLanguage,
+            currentUrl = activeTab.url,
+            translatorEngine = translatorEngine,
+            geminiApiKey = geminiApiKey,
+            geminiModel = geminiModel,
+            onUpdateTranslatorEngine = { viewModel.updateTranslatorEngine(it) },
+            onUpdateGeminiApiKey = { viewModel.updateGeminiApiKey(it) },
+            onUpdateGeminiModel = { viewModel.updateGeminiModel(it) },
+            onGoogleTranslateUrl = { wrappedUrl ->
+                viewModel.loadUrl(wrappedUrl)
+            },
+            onTranslateWithGemini = { _, onTextExtracted ->
+                val safeWebView = viewModel.webViewPoolManager.getWebView(activeTab.id)
+                safeWebView?.evaluateJavascript("(function() { return document.body.innerText || ''; })()") { rawResult: String? ->
+                    if (!rawResult.isNullOrBlank() && rawResult != "null") {
+                        try {
+                            val clean = org.json.JSONTokener(rawResult).nextValue().toString()
+                            onTextExtracted(clean)
+                        } catch (e: Exception) {
+                            onTextExtracted(rawResult)
+                        }
+                    } else {
+                        onTextExtracted("")
+                    }
+                }
+            },
+            onDismiss = { viewModel.setTranslationSheetVisible(false) }
         )
     }
 

@@ -240,7 +240,7 @@ fun LinkPreviewOverlay(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(240.dp)
+                                    .height(360.dp)
                                     .clip(RoundedCornerShape(16.dp)),
                                 shape = RoundedCornerShape(16.dp),
                                 color = MaterialTheme.colorScheme.surface,
