@@ -1196,30 +1196,6 @@ private fun LazyListScope.browserTabContent(
                     )
                 }
             )
-
-            IOSHairlineDivider()
-
-            IOSSettingsRow(
-                icon = Icons.Default.Person,
-                iconBgColor = Color(0xFF34C759), // iOS System Green
-                title = "Created by aryaxzell",
-                subtitle = "github.com/aryaxzell",
-                onClick = {
-                    try {
-                        uriHandler.openUri("https://github.com/aryaxzell")
-                    } catch (e: Exception) {
-                        // Fallback if no external browser/handler
-                    }
-                },
-                trailingContent = {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = "Open GitHub profile",
-                        tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            )
         }
     }
 }
