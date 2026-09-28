@@ -38,6 +38,8 @@ class BrowserPreferences(context: Context) {
         private const val KEY_REMOTE_DEBUGGING = "pref_remote_debugging"
         private const val KEY_LINK_PREVIEW_ENABLED = "pref_link_preview_enabled"
         private const val KEY_APP_LANGUAGE = "pref_app_language"
+        private const val KEY_INSTALLED_RUN_NUMBER = "pref_installed_run_number"
+        private const val KEY_GITHUB_TOKEN = "pref_github_token"
     }
 
     private val _appLanguage = MutableStateFlow(loadAppLanguage())
@@ -338,4 +340,16 @@ class BrowserPreferences(context: Context) {
         }
         prefs.edit().putString(KEY_SHORTCUTS, arr.toString()).apply()
     }
+
+    var installedRunNumber: Int
+        get() = prefs.getInt(KEY_INSTALLED_RUN_NUMBER, 22)
+        set(value) {
+            prefs.edit().putInt(KEY_INSTALLED_RUN_NUMBER, value).apply()
+        }
+
+    var githubToken: String
+        get() = prefs.getString(KEY_GITHUB_TOKEN, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_GITHUB_TOKEN, value).apply()
+        }
 }

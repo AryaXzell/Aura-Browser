@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -29,10 +30,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.aryaxzell.aurabrowser.BuildConfig
 import com.aryaxzell.aurabrowser.data.localization.AppStrings
 import com.aryaxzell.aurabrowser.data.model.AppLanguage
+import com.aryaxzell.aurabrowser.data.model.WhatsNewData
+import com.aryaxzell.aurabrowser.data.preferences.BrowserPreferences
+import com.aryaxzell.aurabrowser.data.update.AppUpdateManager
+import com.aryaxzell.aurabrowser.data.update.UpdateCheckResult
 import com.aryaxzell.aurabrowser.ui.util.iosPressEffect
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,9 +55,33 @@ fun AboutAppView(
     val strings = remember(currentLanguage) { AppStrings(currentLanguage) }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { BrowserPreferences(context) }
 
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+
+    // Update States
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var showUpdateModal by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadStatus by remember { mutableStateOf("") }
+    var downloadErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Periodic / on-mount check for updates
+    LaunchedEffect(Unit) {
+        val res = AppUpdateManager.checkForUpdate(
+            context = context,
+            currentRunNumber = prefs.installedRunNumber,
+            githubToken = prefs.githubToken.ifBlank { null }
+        )
+        if (res is UpdateCheckResult.UpdateAvailable) {
+            updateResult = res
+            showUpdateModal = true
+        }
+    }
 
     val privacyContent = remember(currentLanguage) {
         when (currentLanguage) {
@@ -259,6 +290,34 @@ fun AboutAppView(
                         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
                     ) {
                         Column {
+                            // Check for updates item
+                            AboutRowItem(
+                                icon = Icons.Default.SystemUpdate,
+                                iconBg = Color(0xFF007AFF),
+                                title = strings.aboutUpdateTitle,
+                                subtitle = if (isCheckingUpdate) strings.aboutCheckingUpdate else strings.aboutUpdateDesc,
+                                onClick = {
+                                    if (!isCheckingUpdate && !isDownloading) {
+                                        scope.launch {
+                                            isCheckingUpdate = true
+                                            downloadErrorMessage = null
+                                            val res = AppUpdateManager.checkForUpdate(
+                                                context = context,
+                                                currentRunNumber = prefs.installedRunNumber,
+                                                githubToken = prefs.githubToken.ifBlank { null }
+                                            )
+                                            isCheckingUpdate = false
+                                            updateResult = res
+                                            showUpdateModal = true
+                                        }
+                                    }
+                                }
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 54.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                            )
                             AboutRowItem(
                                 icon = Icons.Default.ListAlt,
                                 iconBg = Color(0xFF5856D6),
@@ -364,15 +423,14 @@ fun AboutAppView(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Coil AsyncImage loads AryaXzell's GitHub profile avatar
-                            coil.compose.AsyncImage(
+                            AsyncImage(
                                 model = "https://github.com/AryaXzell.png",
                                 contentDescription = "AryaXzell GitHub Profile",
                                 modifier = Modifier
                                     .size(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)),
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                contentScale = ContentScale.Crop
                             )
 
                             Column(modifier = Modifier.weight(1f)) {
@@ -443,7 +501,7 @@ fun AboutAppView(
                 )
             },
             text = {
-                val entries = com.aryaxzell.aurabrowser.data.model.WhatsNewData.entries
+                val entries = WhatsNewData.entries
                 Column(
                     modifier = Modifier
                         .heightIn(max = 360.dp)
@@ -523,6 +581,316 @@ fun AboutAppView(
                 }
             }
         )
+    }
+
+    // iOS Style Update Modal
+    if (showUpdateModal && updateResult != null) {
+        when (val res = updateResult!!) {
+            is UpdateCheckResult.UpToDate -> {
+                IOSAlertModal(
+                    title = strings.aboutTitle,
+                    message = "${strings.aboutUpToDateMessage}\n(${res.deviceArchitecture})",
+                    onDismissRequest = { showUpdateModal = false }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clickable { showUpdateModal = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "OK",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    }
+                }
+            }
+
+            is UpdateCheckResult.UpdateAvailable -> {
+                val archLabel = res.artifact?.architecture ?: res.deviceArchitecture
+                IOSAlertModal(
+                    title = "Pembaruan Tersedia",
+                    message = if (downloadErrorMessage != null) {
+                        downloadErrorMessage!!
+                    } else if (isDownloading) {
+                        downloadStatus
+                    } else {
+                        "${strings.aboutDownloadPrompt}\n\n${res.newVersion} [$archLabel]\n${res.runInfo.title}"
+                    },
+                    onDismissRequest = {
+                        if (!isDownloading) showUpdateModal = false
+                    },
+                    content = if (isDownloading) {
+                        {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (downloadProgress > 0f) {
+                                    LinearProgressIndicator(
+                                        progress = { downloadProgress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp))
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "${(downloadProgress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                }
+                            }
+                        }
+                    } else null
+                ) {
+                    if (isDownloading) {
+                        // While downloading, show non-clickable status
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Mengunduh...",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    } else if (downloadErrorMessage != null) {
+                        // Error handling: Tetap di dalam aplikasi tanpa membuka browser eksternal
+                        Row(modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        showUpdateModal = false
+                                        downloadErrorMessage = null
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Tutup",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                            VerticalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        downloadErrorMessage = null
+                                        val candidateUrls = res.artifact?.directDownloadUrls ?: emptyList()
+                                        val urls = if (candidateUrls.isNotEmpty()) candidateUrls else listOf(
+                                            "https://github.com/AryaXzell/Aura-Browser/releases/download/continuous/app-universal-release.apk"
+                                        )
+                                        scope.launch {
+                                            isDownloading = true
+                                            downloadProgress = 0f
+                                            downloadStatus = "Menghubungkan ke server unduhan..."
+                                            val dlResult = AppUpdateManager.downloadExtractAndInstall(
+                                                context = context,
+                                                downloadUrls = urls,
+                                                githubToken = prefs.githubToken.ifBlank { null },
+                                                onProgress = { downloadProgress = it },
+                                                onStatusChange = { downloadStatus = it }
+                                            )
+                                            isDownloading = false
+                                            dlResult.onSuccess { apkFile ->
+                                                prefs.installedRunNumber = res.runInfo.runNumber
+                                                showUpdateModal = false
+                                                AppUpdateManager.launchApkInstaller(context, apkFile)
+                                            }.onFailure { err ->
+                                                downloadErrorMessage = err.localizedMessage ?: "Gagal mengunduh berkas pembaruan"
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Coba Lagi",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        // Normal prompt: Batal vs Download (100% in-app)
+                        Row(modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable { showUpdateModal = false },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Batal",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                            VerticalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        val candidateUrls = res.artifact?.directDownloadUrls ?: emptyList()
+                                        val urls = if (candidateUrls.isNotEmpty()) candidateUrls else listOf(
+                                            "https://github.com/AryaXzell/Aura-Browser/releases/download/continuous/app-universal-release.apk"
+                                        )
+                                        scope.launch {
+                                            isDownloading = true
+                                            downloadProgress = 0f
+                                            downloadStatus = "Menghubungkan ke server unduhan..."
+                                            val dlResult = AppUpdateManager.downloadExtractAndInstall(
+                                                context = context,
+                                                downloadUrls = urls,
+                                                githubToken = prefs.githubToken.ifBlank { null },
+                                                onProgress = { downloadProgress = it },
+                                                onStatusChange = { downloadStatus = it }
+                                            )
+                                            isDownloading = false
+                                            dlResult.onSuccess { apkFile ->
+                                                prefs.installedRunNumber = res.runInfo.runNumber
+                                                showUpdateModal = false
+                                                AppUpdateManager.launchApkInstaller(context, apkFile)
+                                            }.onFailure { err ->
+                                                downloadErrorMessage = err.localizedMessage ?: "Gagal mengunduh berkas pembaruan"
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Download",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            is UpdateCheckResult.Error -> {
+                IOSAlertModal(
+                    title = "Pemeriksaan Gagal",
+                    message = res.message,
+                    onDismissRequest = { showUpdateModal = false }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clickable { showUpdateModal = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Tutup",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IOSAlertModal(
+    title: String,
+    message: String,
+    onDismissRequest: () -> Unit,
+    content: (@Composable () -> Unit)? = null,
+    buttons: @Composable () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .fillMaxWidth(0.85f),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        ) {
+            Column(
+                modifier = Modifier.padding(top = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        lineHeight = 19.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+
+                if (content != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                        content()
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
+
+                buttons()
+            }
+        }
     }
 }
 

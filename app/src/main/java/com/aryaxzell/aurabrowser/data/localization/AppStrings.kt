@@ -908,4 +908,106 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.EN -> "Thank you for using Aura Browser. Your support means the world to us!"
         AppLanguage.RU -> "Спасибо за использование Aura Browser. Ваша поддержка очень важна для нас!"
     }
+
+    val aboutUpdateTitle: String = when (language) {
+        AppLanguage.ID -> "Cek Pembaruan"
+        AppLanguage.EN -> "Check for Updates"
+        AppLanguage.RU -> "Проверить обновления"
+    }
+
+    val aboutUpdateDesc: String = when (language) {
+        AppLanguage.ID -> "Periksa pembaruan di GitHub Actions"
+        AppLanguage.EN -> "Check for updates on GitHub Actions"
+        AppLanguage.RU -> "Проверить обновления на GitHub Actions"
+    }
+
+    val aboutCheckingUpdate: String = when (language) {
+        AppLanguage.ID -> "Memeriksa..."
+        AppLanguage.EN -> "Checking..."
+        AppLanguage.RU -> "Проверка..."
+    }
+
+    val aboutUpToDateMessage: String = when (language) {
+        AppLanguage.ID -> "Versi anda sudah versi terbaru"
+        AppLanguage.EN -> "Your version is up to date"
+        AppLanguage.RU -> "У вас установлена последняя версия"
+    }
+
+    val aboutDownloadPrompt: String = when (language) {
+        AppLanguage.ID -> "download versi terbaru?"
+        AppLanguage.EN -> "Download the latest version?"
+        AppLanguage.RU -> "Скачать последнюю версию?"
+    }
+
+    val defaultBrowserTitle: String = when (language) {
+        AppLanguage.ID -> "Browser Default"
+        AppLanguage.EN -> "Default Browser"
+        AppLanguage.RU -> "Основной браузер"
+    }
+
+    val defaultBrowserSubtitle: String = when (language) {
+        AppLanguage.ID -> "Jadikan Aura Browser sebagai browser utama Anda untuk membuka tautan eksternal secara cepat, aman, dan tanpa iklan."
+        AppLanguage.EN -> "Set Aura Browser as your default browser to open external links fast, securely, and ad-free."
+        AppLanguage.RU -> "Сделайте Aura Browser браузером по умолчанию для быстрого и безопасного открытия ссылок без рекламы."
+    }
+
+    val defaultBrowserRecommended: String = when (language) {
+        AppLanguage.ID -> "Disarankan untuk pengalaman terbaik"
+        AppLanguage.EN -> "Recommended for the best experience"
+        AppLanguage.RU -> "Рекомендуется для наилучшего удобства"
+    }
+
+    val setAsDefaultButton: String = when (language) {
+        AppLanguage.ID -> "Jadikan Browser Default"
+        AppLanguage.EN -> "Set as Default Browser"
+        AppLanguage.RU -> "Сделать браузером по умолчанию"
+    }
+
+    val skipForNowButton: String = when (language) {
+        AppLanguage.ID -> "Lewati untuk sekarang"
+        AppLanguage.EN -> "Skip for now"
+        AppLanguage.RU -> "Пропустить пока"
+    }
+
+    val isDefaultSuccess: String = when (language) {
+        AppLanguage.ID -> "Aura Browser sudah menjadi browser default Anda"
+        AppLanguage.EN -> "Aura Browser is set as your default browser"
+        AppLanguage.RU -> "Aura Browser установлен браузером по умолчанию"
+    }
+
+    val defaultBrowserFeature1Title: String = when (language) {
+        AppLanguage.ID -> "Privasi Terjamin & Bebas Iklan"
+        AppLanguage.EN -> "Guaranteed Privacy & Ad-Free"
+        AppLanguage.RU -> "Конфиденциальность и без рекламы"
+    }
+
+    val defaultBrowserFeature1Desc: String = when (language) {
+        AppLanguage.ID -> "Tautan eksternal otomatis terbuka tanpa pelacak dan iklan pop-up yang mengganggu."
+        AppLanguage.EN -> "External links open automatically without trackers or intrusive pop-up ads."
+        AppLanguage.RU -> "Внешние ссылки открываются без трекеров и навязчивой рекламы."
+    }
+
+    val defaultBrowserFeature2Title: String = when (language) {
+        AppLanguage.ID -> "Kecepatan Akses Seketika"
+        AppLanguage.EN -> "Instant Access Speed"
+        AppLanguage.RU -> "Мгновенная скорость доступа"
+    }
+
+    val defaultBrowserFeature2Desc: String = when (language) {
+        AppLanguage.ID -> "Didukung mesin WebView pool optimal untuk pemuatan halaman super gesit."
+        AppLanguage.EN -> "Powered by an optimized WebView pool for blazing-fast page loads."
+        AppLanguage.RU -> "Оптимизированный движок WebView для сверхбыстрой загрузки страниц."
+    }
+
+    val defaultBrowserFeature3Title: String = when (language) {
+        AppLanguage.ID -> "Integrasi Tautan Langsung"
+        AppLanguage.EN -> "Seamless Link Integration"
+        AppLanguage.RU -> "Прямая интеграция ссылок"
+    }
+
+    val defaultBrowserFeature3Desc: String = when (language) {
+        AppLanguage.ID -> "Buka link dari pesan, email, atau sosial media tanpa repot memilih browser."
+        AppLanguage.EN -> "Open links from messages, emails, or social apps directly without picking a browser."
+        AppLanguage.RU -> "Открывайте ссылки из сообщений, почты или соцсетей сразу без лишних окон."
+    }
 }

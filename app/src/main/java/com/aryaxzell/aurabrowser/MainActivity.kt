@@ -140,6 +140,7 @@ class MainActivity : ComponentActivity() {
         // Initialize static assets MemoryCache asynchronously on idle to keep onCreate under 2ms
         android.os.Looper.myQueue().addIdleHandler {
             com.aryaxzell.aurabrowser.data.cache.MemoryCache.initialize(this)
+            com.aryaxzell.aurabrowser.data.update.AppUpdateManager.cleanUpdateArtifacts(this)
             false
         }
 
