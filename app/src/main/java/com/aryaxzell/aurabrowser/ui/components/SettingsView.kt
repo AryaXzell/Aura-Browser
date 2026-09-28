@@ -174,6 +174,7 @@ fun SettingsView(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNameEditDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
+    var showAboutScreen by remember { mutableStateOf(false) }
 
     var devTapCount by remember { mutableIntStateOf(0) }
     var currentToast by remember { mutableStateOf<Toast?>(null) }
@@ -368,7 +369,9 @@ fun SettingsView(
                                         onDevTapCountChange = { devTapCount = it },
                                         currentToast = currentToast,
                                         onCurrentToastChange = { currentToast = it },
-                                        uriHandler = uriHandler
+                                        uriHandler = uriHandler,
+                                        currentLanguage = currentLanguage,
+                                        onOpenAboutScreen = { showAboutScreen = true }
                                     )
                                 }
                             }
@@ -492,6 +495,17 @@ fun SettingsView(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showAboutScreen) {
+        AboutAppView(
+            currentLanguage = currentLanguage,
+            isDeveloperMode = isDeveloperMode,
+            onSetDeveloperMode = onSetDeveloperMode,
+            devTapCount = devTapCount,
+            onDevTapCountChange = { devTapCount = it },
+            onDismiss = { showAboutScreen = false }
         )
     }
 }
@@ -1065,7 +1079,9 @@ private fun LazyListScope.browserTabContent(
     onDevTapCountChange: (Int) -> Unit,
     currentToast: Toast?,
     onCurrentToastChange: (Toast?) -> Unit,
-    uriHandler: androidx.compose.ui.platform.UriHandler
+    uriHandler: androidx.compose.ui.platform.UriHandler,
+    currentLanguage: AppLanguage,
+    onOpenAboutScreen: () -> Unit
 ) {
     // Card 1: Web Engine
     item {
@@ -1167,40 +1183,16 @@ private fun LazyListScope.browserTabContent(
         ) {
             IOSSettingsRow(
                 icon = Icons.Default.Info,
-                iconBgColor = Color(0xFF8E8E93), // iOS System Gray
-                title = "Aura Browser",
-                subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                onClick = {
-                    if (isDeveloperMode) {
-                        currentToast?.cancel()
-                        val toast = Toast.makeText(context, "No need, you are already a developer.", Toast.LENGTH_SHORT)
-                        onCurrentToastChange(toast)
-                        toast.show()
-                    } else {
-                        val newCount = devTapCount + 1
-                        onDevTapCountChange(newCount)
-                        val remaining = 7 - newCount
-                        if (remaining in 1..4) {
-                            val stepText = if (remaining == 1) "step" else "steps"
-                            currentToast?.cancel()
-                            val toast = Toast.makeText(context, "You are now $remaining $stepText away from being a developer.", Toast.LENGTH_SHORT)
-                            onCurrentToastChange(toast)
-                            toast.show()
-                        } else if (remaining <= 0) {
-                            currentToast?.cancel()
-                            val toast = Toast.makeText(context, "You are now a developer!", Toast.LENGTH_SHORT)
-                            onCurrentToastChange(toast)
-                            toast.show()
-                            onSetDeveloperMode(true)
-                            onDevTapCountChange(0)
-                        }
-                    }
-                },
+                iconBgColor = Color(0xFF007AFF), // iOS System Blue
+                title = strings.aboutTitle,
+                subtitle = "Aura Browser details",
+                onClick = onOpenAboutScreen,
                 trailingContent = {
-                    Text(
-                        text = "v${BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "About Aura Browser",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             )
@@ -1223,7 +1215,7 @@ private fun LazyListScope.browserTabContent(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = "Open GitHub profile",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = Color(0xFF8E8E93),
                         modifier = Modifier.size(18.dp)
                     )
                 }

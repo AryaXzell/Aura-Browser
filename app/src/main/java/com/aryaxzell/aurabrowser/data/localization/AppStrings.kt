@@ -805,4 +805,107 @@ class AppStrings(val language: AppLanguage) {
         AppLanguage.EN -> "Available Models List"
         AppLanguage.RU -> "Список доступных моделей"
     }
+
+    // About App
+    val aboutTitle: String = when (language) {
+        AppLanguage.ID -> "Tentang"
+        AppLanguage.EN -> "About"
+        AppLanguage.RU -> "О приложении"
+    }
+
+    val aboutSlogan: String = when (language) {
+        AppLanguage.ID -> "Ringan. Cepat. Milik Anda."
+        AppLanguage.EN -> "Light. Fast. Yours."
+        AppLanguage.RU -> "Легкий. Быстрый. Твой."
+    }
+
+    val aboutIntroText: String = when (language) {
+        AppLanguage.ID -> "Aura Browser adalah peramban web modern yang dibangun untuk kecepatan, privasi, dan pengalaman menjelajah yang lebih baik. Ringan, simpel, namun tetap bertenaga."
+        AppLanguage.EN -> "Aura Browser is a modern web browser built for speed, privacy, and a better browsing experience. Lightweight, simple, yet powerful."
+        AppLanguage.RU -> "Aura Browser — это современный веб-браузер, созданный для скорости, конфиденциальности и лучшего удобства работы в Интернете. Легкий, простой, но мощный."
+    }
+
+    val aboutBadgeFast: String = when (language) {
+        AppLanguage.ID -> "Cepat"
+        AppLanguage.EN -> "Fast"
+        AppLanguage.RU -> "Быстрый"
+    }
+
+    val aboutBadgePrivate: String = when (language) {
+        AppLanguage.ID -> "Privat"
+        AppLanguage.EN -> "Private"
+        AppLanguage.RU -> "Приватный"
+    }
+
+    val aboutBadgeOpenSource: String = when (language) {
+        AppLanguage.ID -> "Sumber Terbuka"
+        AppLanguage.EN -> "Open Source"
+        AppLanguage.RU -> "Открытый код"
+    }
+
+    val aboutBadgeModern: String = when (language) {
+        AppLanguage.ID -> "Modern"
+        AppLanguage.EN -> "Modern"
+        AppLanguage.RU -> "Современный"
+    }
+
+    val aboutChangelogTitle: String = when (language) {
+        AppLanguage.ID -> "Catatan Rilis"
+        AppLanguage.EN -> "Changelog"
+        AppLanguage.RU -> "История изменений"
+    }
+
+    val aboutChangelogDesc: String = when (language) {
+        AppLanguage.ID -> "Lihat perubahan di versi ini"
+        AppLanguage.EN -> "View changes in this version"
+        AppLanguage.RU -> "Посмотреть изменения в этой версии"
+    }
+
+    val aboutSourceCodeTitle: String = when (language) {
+        AppLanguage.ID -> "Kode Sumber"
+        AppLanguage.EN -> "Source Code"
+        AppLanguage.RU -> "Исходный код"
+    }
+
+    val aboutSourceCodeDesc: String = when (language) {
+        AppLanguage.ID -> "GitHub • Sumber Terbuka"
+        AppLanguage.EN -> "GitHub • Open Source"
+        AppLanguage.RU -> "GitHub • Открытый код"
+    }
+
+    val aboutPrivacyTitle: String = when (language) {
+        AppLanguage.ID -> "Kebijakan Privasi"
+        AppLanguage.EN -> "Privacy Policy"
+        AppLanguage.RU -> "Политика конфиденциальности"
+    }
+
+    val aboutPrivacyDesc: String = when (language) {
+        AppLanguage.ID -> "Bagaimana kami melindungi data Anda"
+        AppLanguage.EN -> "How we protect your data"
+        AppLanguage.RU -> "Как мы защищаем ваши данные"
+    }
+
+    val aboutSupportTitle: String = when (language) {
+        AppLanguage.ID -> "Dukungan"
+        AppLanguage.EN -> "Support"
+        AppLanguage.RU -> "Поддержка"
+    }
+
+    val aboutSupportDesc: String = when (language) {
+        AppLanguage.ID -> "Hubungi kami jika ada pertanyaan atau bug"
+        AppLanguage.EN -> "Contact us if you have questions or bugs"
+        AppLanguage.RU -> "Свяжитесь с нами при возникновении вопросов"
+    }
+
+    val aboutPassionTitle: String = when (language) {
+        AppLanguage.ID -> "Dibuat dengan penuh semangat"
+        AppLanguage.EN -> "Made with passion"
+        AppLanguage.RU -> "Сделано с любовью"
+    }
+
+    val aboutPassionDesc: String = when (language) {
+        AppLanguage.ID -> "Terima kasih sudah menggunakan Aura Browser. Dukungan kalian sangat berarti!"
+        AppLanguage.EN -> "Thank you for using Aura Browser. Your support means the world to us!"
+        AppLanguage.RU -> "Спасибо за использование Aura Browser. Ваша поддержка очень важна для нас!"
+    }
 }

@@ -559,7 +559,7 @@ fun BrowserWebView(
                                     view.evaluateJavascript(
                                         """
                                         (function() {
-                                            var meta = document.querySelector('meta[name="theme-color"]');
+                                            var meta = document.querySelector('meta[name="theme-color"]'); (function(){const skipYT=()=>{const v=document.querySelector('video');const ad=document.querySelector('.ad-showing,.ad-container,.ytp-ad-module,.video-ads');if(ad&&v){if(v.duration&&!isNaN(v.duration)){v.currentTime=v.duration-0.1;}v.playbackRate=16;v.muted=true;}const sb=document.querySelectorAll('.ytp-ad-skip-button,.ytp-ad-skip-button-text,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-slot');sb.forEach(b=>{if(b)b.click();});const ae=document.querySelectorAll('.ytp-ad-overlay-container,#player-ads,ytd-promoted-video-renderer,.ytp-ad-message-container,.ytp-ad-player-overlay-instream-info');ae.forEach(e=>{if(e)e.style.setProperty('display','none','important');});};const skipSp=()=>{const ab=document.querySelectorAll('[aria-label="Advertisement"],.ads-container,iframe[src*="doubleclick"]');ab.forEach(e=>e.remove());const tn=document.querySelector('[data-testid="now-playing-widget"] [data-testid="context-item-link"]');if(tn&&(tn.textContent.toLowerCase().includes('advertisement')||tn.textContent.toLowerCase().includes('iklan'))){const m=document.querySelector('audio,video');if(m){m.currentTime=m.duration-0.1;m.playbackRate=16;m.muted=true;}}};const cos=()=>{const sel=['.adsbygoogle','iframe[id^="google_ads_iframe"]','iframe[src*="doubleclick"]','.ad-box','.ad-container','.ad-slot','.sponsored-post','#ad-banner','#ads-container','div[id^="div-gpt-ad"]','a[href*="doubleclick.net"]','img[src*="ad-system"]','.mgid-widget','.taboola-ad','amp-embed[type="taboola"]','.outbrain-ad','div[class*="ad-placement"]','div[class*="sponsored-links"]'];sel.forEach(s=>{try{document.querySelectorAll(s).forEach(e=>{e.style.setProperty('display','none','important');});}catch(e){}});};setInterval(()=>{skipYT();skipSp();cos();},400);})();
                                             if (meta && meta.content) return meta.content;
                                             var header = document.querySelector('header') || document.querySelector('nav');
                                             if (header) {
@@ -617,7 +617,7 @@ fun BrowserWebView(
                                     val isMain = request.isForMainFrame
                                     val headers = request.requestHeaders ?: emptyMap()
 
-                                    if (currentAdBlockState && adBlockEngine.isAdDomain(host)) {
+                                    if (currentAdBlockState && (adBlockEngine.isAdDomain(host) || isKnownAdPath(requestUrl, host))) {
                                         onAddNetworkLogEntry?.invoke(
                                             activeTabId,
                                             NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.BLOCKED_AD, headers = headers)
@@ -628,7 +628,7 @@ fun BrowserWebView(
                                             ByteArrayInputStream(ByteArray(0))
                                         )
                                     }
-                                    if (currentDoNotTrackState && (adBlockEngine.isTrackerDomain(host) || isKnownTrackerPath(path))) {
+                                    if (currentDoNotTrackState && (adBlockEngine.isTrackerDomain(host) || isKnownTrackerPath(requestUrl, host))) {
                                         onAddNetworkLogEntry?.invoke(
                                             activeTabId,
                                             NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.BLOCKED_TRACKER, headers = headers)
@@ -841,12 +841,77 @@ private fun parseColorString(colorStr: String): Int? {
     }
 }
 
-private fun isKnownTrackerPath(path: String): Boolean {
-    return path.contains("/analytics/collect") ||
-        path.contains("/gtag/js") ||
-        path.contains("/pixel.gif") ||
-        path.contains("/track.gif") ||
-        path.contains("/beacon")
+private fun isKnownAdPath(url: String, host: String): Boolean {
+    val lowerUrl = url.lowercase()
+    val lowerHost = host.lowercase()
+
+    // YouTube Specific Ads and Telemetry Blocking
+    if (lowerHost.contains("youtube.com") || lowerHost.contains("youtu.be")) {
+        if (lowerUrl.contains("/pagead/") ||
+            lowerUrl.contains("/api/stats/ads") ||
+            lowerUrl.contains("/ptracking") ||
+            lowerUrl.contains("/youtubei/v1/att/") ||
+            lowerUrl.contains("/ad_") ||
+            lowerUrl.contains("doubleclick") ||
+            lowerUrl.contains("/get_midroll_")
+        ) {
+            return true
+        }
+    }
+
+    // Spotify Specific Ads blocking
+    if (lowerHost.contains("spotify.com")) {
+        if (lowerUrl.contains("/ad-logic/") ||
+            lowerUrl.contains("/api/ad/") ||
+            lowerUrl.contains("ads-fa.spotify.com") ||
+            lowerUrl.contains("/v1/ad-")
+        ) {
+            return true
+        }
+    }
+
+    // Generic Ad Paths
+    return lowerUrl.contains("/ads/") ||
+        lowerUrl.contains("/pagead/") ||
+        lowerUrl.contains("/adserver/") ||
+        lowerUrl.contains("doubleclick.net") ||
+        lowerUrl.contains("googleadservices.com") ||
+        lowerUrl.contains("googlesyndication.com") ||
+        lowerUrl.contains("/ad-placement/") ||
+        lowerUrl.contains("/sponsored/") ||
+        lowerUrl.contains("adclick") ||
+        lowerUrl.contains("adnxs.com") ||
+        lowerUrl.contains("criteo")
+}
+
+private fun isKnownTrackerPath(url: String, host: String): Boolean {
+    val lowerUrl = url.lowercase()
+    val lowerHost = host.lowercase()
+
+    // Check known tracker domains or subdomains
+    if (lowerHost.contains("analytics") ||
+        lowerHost.contains("telemetry") ||
+        lowerHost.contains("tracker") ||
+        lowerHost.contains("metrics") ||
+        lowerHost.contains("bugsnag") ||
+        lowerHost.contains("sentry.io") ||
+        lowerHost.contains("mixpanel") ||
+        lowerHost.contains("amplitude") ||
+        lowerHost.contains("hotjar")
+    ) {
+        return true
+    }
+
+    return lowerUrl.contains("/analytics/collect") ||
+        lowerUrl.contains("/gtag/js") ||
+        lowerUrl.contains("/pixel.gif") ||
+        lowerUrl.contains("/track.gif") ||
+        lowerUrl.contains("/beacon") ||
+        lowerUrl.contains("telemetry") ||
+        lowerUrl.contains("/collect?") ||
+        lowerUrl.contains("/track?") ||
+        lowerUrl.contains("facebook.com/tr/") || // Facebook pixel tracker
+        lowerUrl.contains("connect.facebook.net/en_us/fbevents.js")
 }
 
 class BlobDownloadInterface(
