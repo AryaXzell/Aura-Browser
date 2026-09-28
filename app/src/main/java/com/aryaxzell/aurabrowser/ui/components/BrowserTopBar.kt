@@ -75,6 +75,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaxzell.aurabrowser.data.model.TabItem
 
+import com.aryaxzell.aurabrowser.data.model.SecurityInfo
+import com.aryaxzell.aurabrowser.data.model.SecurityStatus
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Warning
+
 @Composable
 fun BrowserTopBar(
     url: String,
@@ -86,6 +94,8 @@ fun BrowserTopBar(
     themeColor: Int? = null,
     isEditingUrl: Boolean,
     urlInput: String,
+    securityInfo: SecurityInfo? = null,
+    isDeveloperMode: Boolean = false,
     onUrlInputChange: (String) -> Unit,
     onStartEditingUrl: () -> Unit,
     onSubmitUrl: (String) -> Unit,
@@ -101,10 +111,15 @@ fun BrowserTopBar(
     onOpenSettings: () -> Unit,
     onOpenNewTab: (Boolean) -> Unit,
     onShareUrl: () -> Unit,
+    onOpenSiteInfo: () -> Unit = {},
+    onOpenPageSource: () -> Unit = {},
+    onOpenNetworkLog: () -> Unit = {},
+    onOpenConsoleLog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
     val isHttps = url.startsWith("https://")
+    val isHttpOrHttps = url.startsWith("http://") || url.startsWith("https://")
 
     val defaultContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
     val websiteThemeColor = themeColor?.let { Color(it).copy(alpha = 0.88f) }
@@ -194,7 +209,7 @@ fun BrowserTopBar(
                             .padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Security or Search icon
+                        // Security or Search icon (interactive on non-home http/https pages)
                         if (isEditingUrl) {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -210,15 +225,31 @@ fun BrowserTopBar(
                                 modifier = Modifier.size(18.dp)
                             )
                         } else {
-                            Icon(
-                                imageVector = if (isHttps) Icons.Default.Lock else Icons.Default.Search,
-                                contentDescription = if (isHttps) "Secure connection" else "Not secure",
-                                tint = if (isHttps) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            val (secIcon, secTint, secDesc) = when {
+                                securityInfo?.status == SecurityStatus.CERTIFICATE_ERROR -> Triple(Icons.Default.Warning, MaterialTheme.colorScheme.error, "Certificate Error")
+                                isHttps -> Triple(Icons.Default.Lock, MaterialTheme.colorScheme.primary, "Secure connection")
+                                else -> Triple(Icons.Default.LockOpen, MaterialTheme.colorScheme.onSurfaceVariant, "Not secure")
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .clickable(enabled = isHttpOrHttps) {
+                                        onOpenSiteInfo()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = secIcon,
+                                    contentDescription = secDesc,
+                                    tint = secTint,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
 
                         if (isEditingUrl) {
                             BasicTextField(
@@ -359,8 +390,10 @@ fun BrowserTopBar(
                 } else {
                     TopBarMenu(
                         isHome = isHome,
+                        isHttpOrHttps = isHttpOrHttps,
                         isDesktopMode = isDesktopMode,
                         isBookmarked = isBookmarked,
+                        isDeveloperMode = isDeveloperMode,
                         onReload = onReload,
                         onToggleBookmark = onToggleBookmark,
                         onToggleDesktop = onToggleDesktop,
@@ -369,7 +402,10 @@ fun BrowserTopBar(
                         onOpenDownloads = onOpenDownloads,
                         onOpenSettings = onOpenSettings,
                         onOpenNewTab = onOpenNewTab,
-                        onShareUrl = onShareUrl
+                        onShareUrl = onShareUrl,
+                        onOpenPageSource = onOpenPageSource,
+                        onOpenNetworkLog = onOpenNetworkLog,
+                        onOpenConsoleLog = onOpenConsoleLog
                     )
                 }
             }
@@ -401,8 +437,10 @@ private fun ProgressIndicatorBar(isLoading: Boolean, progress: Int) {
 @Composable
 private fun TopBarMenu(
     isHome: Boolean,
+    isHttpOrHttps: Boolean,
     isDesktopMode: Boolean,
     isBookmarked: Boolean,
+    isDeveloperMode: Boolean,
     onReload: () -> Unit,
     onToggleBookmark: () -> Unit,
     onToggleDesktop: () -> Unit,
@@ -411,7 +449,10 @@ private fun TopBarMenu(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNewTab: (Boolean) -> Unit,
-    onShareUrl: () -> Unit
+    onShareUrl: () -> Unit,
+    onOpenPageSource: () -> Unit,
+    onOpenNetworkLog: () -> Unit,
+    onOpenConsoleLog: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -454,7 +495,7 @@ private fun TopBarMenu(
             shadowElevation = 12.dp,
             border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)),
             modifier = Modifier
-                .width(210.dp)
+                .width(220.dp)
                 .clip(RoundedCornerShape(16.dp))
         ) {
             Column(
@@ -488,6 +529,35 @@ private fun TopBarMenu(
                             onShareUrl()
                         }
                     )
+                    if (isHttpOrHttps) {
+                        IOSMenuItem(
+                            text = "View Page Source",
+                            icon = Icons.Default.Code,
+                            onClick = {
+                                expanded = false
+                                onOpenPageSource()
+                            }
+                        )
+                        IOSMenuItem(
+                            text = "Network Log",
+                            icon = Icons.Default.NetworkCheck,
+                            onClick = {
+                                expanded = false
+                                onOpenNetworkLog()
+                            }
+                        )
+                    }
+                    if (isDeveloperMode) {
+                        IOSMenuItem(
+                            text = "Console",
+                            icon = Icons.Default.Terminal,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = {
+                                expanded = false
+                                onOpenConsoleLog()
+                            }
+                        )
+                    }
                     IOSMenuItem(
                         text = "Reload",
                         icon = Icons.Default.Refresh,

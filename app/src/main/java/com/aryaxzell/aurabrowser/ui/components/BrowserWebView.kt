@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -77,6 +78,14 @@ import com.aryaxzell.aurabrowser.viewmodel.BrowserViewModel
 import com.aryaxzell.aurabrowser.webview.WebViewPoolManager
 import java.io.ByteArrayInputStream
 
+import com.aryaxzell.aurabrowser.data.db.SiteSettingsEntity
+import com.aryaxzell.aurabrowser.data.model.ConsoleLevel
+import com.aryaxzell.aurabrowser.data.model.ConsoleLogEntry
+import com.aryaxzell.aurabrowser.data.model.NetworkDecision
+import com.aryaxzell.aurabrowser.data.model.NetworkLogEntry
+import com.aryaxzell.aurabrowser.data.model.SecurityInfo
+import com.aryaxzell.aurabrowser.data.model.SecurityStatus
+
 private const val DESKTOP_USER_AGENT =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
@@ -98,6 +107,9 @@ fun BrowserWebView(
     isAdBlockEnabled: Boolean,
     isJavaScriptEnabled: Boolean,
     isDoNotTrack: Boolean,
+    isDeveloperMode: Boolean = false,
+    isRemoteDebugging: Boolean = false,
+    siteSettingsMap: Map<String, SiteSettingsEntity> = emptyMap(),
     webAction: BrowserViewModel.WebAction?,
     onActionConsumed: () -> Unit,
     onPageStarted: (tabId: String, url: String) -> Unit,
@@ -107,6 +119,10 @@ fun BrowserWebView(
     onReceivedError: (tabId: String, description: String, isOffline: Boolean) -> Unit,
     onFaviconReceived: (tabId: String, faviconBase64: String) -> Unit,
     onThemeColorReceived: ((tabId: String, colorInt: Int?) -> Unit)? = null,
+    onUpdateSecurityInfo: ((tabId: String, SecurityInfo) -> Unit)? = null,
+    onAddNetworkLogEntry: ((tabId: String, NetworkLogEntry) -> Unit)? = null,
+    onAddConsoleLogEntry: ((tabId: String, ConsoleLogEntry) -> Unit)? = null,
+    onLinkLongPress: ((url: String, isSourceIncognito: Boolean) -> Unit)? = null,
     onShowFileChooser: (Intent, ValueCallback<Array<Uri>>) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -114,9 +130,43 @@ fun BrowserWebView(
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var defaultUserAgent by remember { mutableStateOf("") }
-    val currentAdBlockState by rememberUpdatedState(isAdBlockEnabled)
+
+    // Resolve per-site overrides
+    val activeHost = remember(activeTabUrl) {
+        try {
+            Uri.parse(activeTabUrl).host?.lowercase()?.removePrefix("www.") ?: ""
+        } catch (e: Exception) { "" }
+    }
+    val currentSiteSettings = siteSettingsMap[activeHost]
+
+    val effectiveJavaScript = when (currentSiteSettings?.javascript) {
+        1 -> true
+        2 -> false
+        else -> isJavaScriptEnabled
+    }
+    val effectiveDesktopMode = when (currentSiteSettings?.desktop) {
+        1 -> true
+        2 -> false
+        else -> isActiveTabDesktopMode
+    }
+    val effectiveAdBlock = when (currentSiteSettings?.adBlock) {
+        1 -> true
+        2 -> false
+        else -> isAdBlockEnabled
+    }
+
+    val currentAdBlockState by rememberUpdatedState(effectiveAdBlock)
     val currentDoNotTrackState by rememberUpdatedState(isDoNotTrack)
     var isFirstAdBlockComposition by remember(activeTabId) { mutableStateOf(true) }
+
+    // Remote Debugging setup
+    LaunchedEffect(isDeveloperMode, isRemoteDebugging) {
+        try {
+            WebView.setWebContentsDebuggingEnabled(isDeveloperMode && isRemoteDebugging)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     // Pull to Refresh state tied to active tab loading
     val isRefreshing = isActiveTabLoading
@@ -135,7 +185,7 @@ fun BrowserWebView(
     fun applyUserAgentForCurrentMode() {
         val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
         safeWebView?.settings?.let { settings ->
-            if (isActiveTabDesktopMode) {
+            if (effectiveDesktopMode) {
                 settings.userAgentString = DESKTOP_USER_AGENT
             } else if (defaultUserAgent.isNotBlank()) {
                 settings.userAgentString = defaultUserAgent
@@ -145,7 +195,7 @@ fun BrowserWebView(
         }
     }
 
-    // Handle ViewModel actions (Reload, Stop, GoBack, GoForward, LoadUrl)
+    // Handle ViewModel actions
     LaunchedEffect(webAction) {
         val action = webAction ?: return@LaunchedEffect
         val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
@@ -177,14 +227,16 @@ fun BrowserWebView(
         onActionConsumed()
     }
 
-    // Reactively reload when AdBlock toggle changes on an active non-home tab (skip first composition on tab entry)
-    LaunchedEffect(isAdBlockEnabled) {
+    // Reactively reload when AdBlock or Site Settings toggle changes on active non-home tab
+    LaunchedEffect(effectiveAdBlock, effectiveJavaScript, effectiveDesktopMode) {
         if (isFirstAdBlockComposition) {
             isFirstAdBlockComposition = false
             return@LaunchedEffect
         }
         val safeWebView = if (webViewPoolManager.hasWebView(activeTabId)) webViewInstance else null
         if (!isActiveTabHome && safeWebView != null) {
+            safeWebView.settings.javaScriptEnabled = effectiveJavaScript
+            applyUserAgentForCurrentMode()
             safeWebView.reload()
         }
     }
@@ -250,6 +302,46 @@ fun BrowserWebView(
                         // Cookie setup
                         CookieManager.getInstance().setAcceptCookie(!isActiveTabIncognito)
                         CookieManager.getInstance().setAcceptThirdPartyCookies(newView, !isActiveTabIncognito)
+
+                        // Link long-press handler for preview & context menu
+                        newView.setOnLongClickListener { v ->
+                            val targetWebView = v as? WebView ?: return@setOnLongClickListener false
+                            val hitTestResult = targetWebView.hitTestResult ?: return@setOnLongClickListener false
+                            val type = hitTestResult.type
+
+                            if (type == WebView.HitTestResult.SRC_ANCHOR_TYPE || type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                                val directUrl = hitTestResult.extra
+
+                                if (type == WebView.HitTestResult.SRC_ANCHOR_TYPE &&
+                                    !directUrl.isNullOrBlank() &&
+                                    (directUrl.startsWith("http://") || directUrl.startsWith("https://"))
+                                ) {
+                                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                    onLinkLongPress?.invoke(directUrl, isActiveTabIncognito)
+                                    return@setOnLongClickListener true
+                                }
+
+                                // Handle image anchors or asynchronous href resolution
+                                val handler = android.os.Handler(android.os.Looper.getMainLooper()) { msg ->
+                                    val href = msg.data?.getString("url")
+                                    val finalUrl = if (!href.isNullOrBlank() && (href.startsWith("http://") || href.startsWith("https://"))) {
+                                        href
+                                    } else if (!directUrl.isNullOrBlank() && (directUrl.startsWith("http://") || directUrl.startsWith("https://"))) {
+                                        directUrl
+                                    } else null
+
+                                    if (!finalUrl.isNullOrBlank()) {
+                                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                        onLinkLongPress?.invoke(finalUrl, isActiveTabIncognito)
+                                    }
+                                    true
+                                }
+                                val msg = handler.obtainMessage()
+                                targetWebView.requestFocusNodeHref(msg)
+                                return@setOnLongClickListener true
+                            }
+                            false
+                        }
 
                         // Register Blob Downloader Interface
                         newView.addJavascriptInterface(BlobDownloadInterface(ctx, downloadTracker), "BlobDownloader")
@@ -325,6 +417,27 @@ fun BrowserWebView(
                                 }
                             }
 
+                            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                                if (consoleMessage != null && isDeveloperMode) {
+                                    val lvl = when (consoleMessage.messageLevel()) {
+                                        android.webkit.ConsoleMessage.MessageLevel.WARNING -> ConsoleLevel.WARNING
+                                        android.webkit.ConsoleMessage.MessageLevel.ERROR -> ConsoleLevel.ERROR
+                                        android.webkit.ConsoleMessage.MessageLevel.DEBUG -> ConsoleLevel.DEBUG
+                                        else -> ConsoleLevel.LOG
+                                    }
+                                    onAddConsoleLogEntry?.invoke(
+                                        activeTabId,
+                                        ConsoleLogEntry(
+                                            level = lvl,
+                                            message = consoleMessage.message(),
+                                            sourceId = consoleMessage.sourceId() ?: "",
+                                            lineNumber = consoleMessage.lineNumber()
+                                        )
+                                    )
+                                }
+                                return super.onConsoleMessage(consoleMessage)
+                            }
+
                             override fun onShowFileChooser(
                                 webView: WebView?,
                                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -350,12 +463,94 @@ fun BrowserWebView(
                                 url?.let { onPageStarted(activeTabId, it) }
                             }
 
+                            override fun onReceivedSslError(
+                                view: WebView?,
+                                handler: android.webkit.SslErrorHandler?,
+                                error: android.net.http.SslError?
+                            ) {
+                                val desc = when (error?.primaryError) {
+                                    android.net.http.SslError.SSL_EXPIRED -> "The security certificate has expired."
+                                    android.net.http.SslError.SSL_IDMISMATCH -> "Hostname mismatch in certificate."
+                                    android.net.http.SslError.SSL_UNTRUSTED -> "Untrusted certificate authority."
+                                    android.net.http.SslError.SSL_NOTYETVALID -> "Certificate is not yet valid."
+                                    else -> "Security certificate error."
+                                }
+                                val sslCert = error?.certificate
+                                val issuedToMap = sslCert?.issuedTo?.let { mapOf("CN" to it.cName, "O" to it.oName, "OU" to it.uName) }
+                                val issuedByMap = sslCert?.issuedBy?.let { mapOf("CN" to it.cName, "O" to it.oName, "OU" to it.uName) }
+
+                                val secInfo = SecurityInfo(
+                                    url = error?.url ?: view?.url.orEmpty(),
+                                    status = SecurityStatus.CERTIFICATE_ERROR,
+                                    sslErrorDescription = desc,
+                                    issuedTo = issuedToMap,
+                                    issuedBy = issuedByMap,
+                                    validFrom = sslCert?.validNotBefore,
+                                    validTo = sslCert?.validNotAfter
+                                )
+                                onUpdateSecurityInfo?.invoke(activeTabId, secInfo)
+                                handler?.cancel()
+                            }
+
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 if (view != null) {
+                                    val currentUrl = url ?: view.url.orEmpty()
+                                    if (currentUrl.startsWith("https://")) {
+                                        val sslCert = view.certificate
+                                        if (sslCert != null) {
+                                            val issuedToMap = mapOf("CN" to sslCert.issuedTo.cName, "O" to sslCert.issuedTo.oName, "OU" to sslCert.issuedTo.uName)
+                                            val issuedByMap = mapOf("CN" to sslCert.issuedBy.cName, "O" to sslCert.issuedBy.oName, "OU" to sslCert.issuedBy.uName)
+
+                                            var serial: String? = null
+                                            var sigAlg: String? = null
+                                            var pubKey: String? = null
+                                            var sanList: List<String>? = null
+                                            var sha256Fingerprint: String? = null
+
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                try {
+                                                    val x509 = sslCert.x509Certificate
+                                                    if (x509 != null) {
+                                                        serial = x509.serialNumber?.toString(16)
+                                                        sigAlg = x509.sigAlgName
+                                                        pubKey = "${x509.publicKey.algorithm} (${x509.publicKey.encoded.size * 8} bits)"
+                                                        sanList = x509.subjectAlternativeNames?.mapNotNull { it.getOrNull(1)?.toString() }
+
+                                                        val md = java.security.MessageDigest.getInstance("SHA-256")
+                                                        val digest = md.digest(x509.encoded)
+                                                        sha256Fingerprint = digest.joinToString(":") { "%02X".format(it) }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
+                                            }
+
+                                            val secInfo = SecurityInfo(
+                                                url = currentUrl,
+                                                status = SecurityStatus.SECURE,
+                                                issuedTo = issuedToMap,
+                                                issuedBy = issuedByMap,
+                                                validFrom = sslCert.validNotBefore,
+                                                validTo = sslCert.validNotAfter,
+                                                serialNumber = serial,
+                                                sigAlgName = sigAlg,
+                                                pubKeyInfo = pubKey,
+                                                san = sanList,
+                                                sha256Fingerprint = sha256Fingerprint
+                                            )
+                                            onUpdateSecurityInfo?.invoke(activeTabId, secInfo)
+                                        }
+                                    } else if (currentUrl.startsWith("http://")) {
+                                        onUpdateSecurityInfo?.invoke(
+                                            activeTabId,
+                                            SecurityInfo(url = currentUrl, status = SecurityStatus.NOT_SECURE)
+                                        )
+                                    }
+
                                     onPageFinished(
                                         activeTabId,
-                                        url ?: view.url.orEmpty(),
+                                        currentUrl,
                                         view.title,
                                         view.canGoBack(),
                                         view.canGoForward()
@@ -417,22 +612,27 @@ fun BrowserWebView(
                                 if (request != null) {
                                     val host = request.url.host?.lowercase() ?: ""
                                     val path = request.url.path?.lowercase() ?: ""
+                                    val requestUrl = request.url.toString()
+                                    val method = request.method ?: "GET"
+                                    val isMain = request.isForMainFrame
+                                    val headers = request.requestHeaders ?: emptyMap()
 
                                     if (currentAdBlockState && adBlockEngine.isAdDomain(host)) {
+                                        onAddNetworkLogEntry?.invoke(
+                                            activeTabId,
+                                            NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.BLOCKED_AD, headers = headers)
+                                        )
                                         return WebResourceResponse(
                                             "text/plain",
                                             "UTF-8",
                                             ByteArrayInputStream(ByteArray(0))
                                         )
                                     }
-                                    if (currentDoNotTrackState && adBlockEngine.isTrackerDomain(host)) {
-                                        return WebResourceResponse(
-                                            "text/plain",
-                                            "UTF-8",
-                                            ByteArrayInputStream(ByteArray(0))
+                                    if (currentDoNotTrackState && (adBlockEngine.isTrackerDomain(host) || isKnownTrackerPath(path))) {
+                                        onAddNetworkLogEntry?.invoke(
+                                            activeTabId,
+                                            NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.BLOCKED_TRACKER, headers = headers)
                                         )
-                                    }
-                                    if (currentDoNotTrackState && isKnownTrackerPath(path)) {
                                         return WebResourceResponse(
                                             "text/plain",
                                             "UTF-8",
@@ -440,15 +640,47 @@ fun BrowserWebView(
                                         )
                                     }
 
-                                    // RAM Cache: Serve static/CDN assets directly from memory to minimize disk I/O and load instantly
+                                    // RAM Cache
                                     if (!isActiveTabIncognito) {
                                         val cachedResponse = com.aryaxzell.aurabrowser.data.cache.MemoryCache.handleIntercept(request)
                                         if (cachedResponse != null) {
+                                            onAddNetworkLogEntry?.invoke(
+                                                activeTabId,
+                                                NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.SERVED_FROM_CACHE, headers = headers)
+                                            )
                                             return cachedResponse
                                         }
                                     }
+
+                                    onAddNetworkLogEntry?.invoke(
+                                        activeTabId,
+                                        NetworkLogEntry(id = System.nanoTime(), method = method, url = requestUrl, isMainFrame = isMain, decision = NetworkDecision.ALLOWED, headers = headers)
+                                    )
                                 }
                                 return super.shouldInterceptRequest(view, request)
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                errorResponse: WebResourceResponse?
+                            ) {
+                                super.onReceivedHttpError(view, request, errorResponse)
+                                if (request != null) {
+                                    val code = errorResponse?.statusCode ?: 0
+                                    onAddNetworkLogEntry?.invoke(
+                                        activeTabId,
+                                        NetworkLogEntry(
+                                            id = System.nanoTime(),
+                                            method = request.method ?: "GET",
+                                            url = request.url.toString(),
+                                            isMainFrame = request.isForMainFrame,
+                                            decision = NetworkDecision.FAILED,
+                                            errorDescription = "HTTP $code",
+                                            responseStatus = code
+                                        )
+                                    )
+                                }
                             }
 
                             override fun onReceivedError(
@@ -457,9 +689,22 @@ fun BrowserWebView(
                                 error: WebResourceError?
                             ) {
                                 super.onReceivedError(view, request, error)
+                                val desc = error?.description?.toString() ?: "Failed to load page"
+                                if (request != null) {
+                                    onAddNetworkLogEntry?.invoke(
+                                        activeTabId,
+                                        NetworkLogEntry(
+                                            id = System.nanoTime(),
+                                            method = request.method ?: "GET",
+                                            url = request.url.toString(),
+                                            isMainFrame = request.isForMainFrame,
+                                            decision = NetworkDecision.FAILED,
+                                            errorDescription = desc
+                                        )
+                                    )
+                                }
                                 if (request?.isForMainFrame == true) {
                                     val isOffline = !isNetworkAvailable(ctx)
-                                    val desc = error?.description?.toString() ?: "Failed to load page"
                                     onReceivedError(activeTabId, desc, isOffline)
                                 }
                             }

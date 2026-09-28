@@ -64,6 +64,11 @@ class WebViewPoolManager {
     }
 
     @Synchronized
+    fun getWebView(tabId: String): WebView? {
+        return pool[tabId]
+    }
+
+    @Synchronized
     fun hasWebView(tabId: String): Boolean {
         return pool.containsKey(tabId)
     }

@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,6 +56,7 @@ import java.util.Locale
 @Composable
 fun HistoryView(
     history: List<HistoryEntity>,
+    language: AppLanguage = AppLanguage.EN,
     onSelectHistory: (String) -> Unit,
     onDeleteHistory: (HistoryEntity) -> Unit,
     onClearAllHistory: () -> Unit,
@@ -61,6 +64,7 @@ fun HistoryView(
     onSwitchToDownloads: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(language) { AppStrings(language) }
     var searchQuery by remember { mutableStateOf("") }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
@@ -100,12 +104,12 @@ fun HistoryView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Kembali",
+                            contentDescription = strings.back,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = "Kembali",
+                            text = strings.back,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -113,14 +117,14 @@ fun HistoryView(
                 }
 
                 Text(
-                    text = "History",
+                    text = strings.historyTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 TextButton(onClick = onDismiss) {
                     Text(
-                        text = "Selesai",
+                        text = strings.done,
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -131,7 +135,7 @@ fun HistoryView(
 
             // iOS Segmented Control
             IOSHubSegmentedControl(
-                options = listOf("Bookmarks", "History", "Downloads"),
+                options = listOf(strings.bookmarksTitle, strings.historyTitle, strings.downloadsTitle),
                 selectedOption = 1,
                 onOptionSelected = { index ->
                     when (index) {
@@ -161,7 +165,7 @@ fun HistoryView(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Hapus Semua")
+                            Text(strings.clearAll)
                         }
                     }
                 }
@@ -171,7 +175,7 @@ fun HistoryView(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search history...") },
+                placeholder = { Text(strings.searchPlaceholder) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -198,7 +202,7 @@ fun HistoryView(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isEmpty()) "No history yet" else "No matching history",
+                        text = strings.noHistory,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

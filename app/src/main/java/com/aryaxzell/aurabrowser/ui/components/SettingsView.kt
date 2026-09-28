@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +70,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Language
 import java.io.File
 import java.io.FileOutputStream
@@ -115,11 +117,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaxzell.aurabrowser.BuildConfig
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
+import com.aryaxzell.aurabrowser.ui.components.CountryFlag
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsView(
+    currentLanguage: AppLanguage = AppLanguage.EN,
+    onSelectLanguage: (AppLanguage) -> Unit = {},
     currentSearchEngine: SearchEngine,
     onSelectSearchEngine: (SearchEngine) -> Unit,
     userName: String,
@@ -148,18 +155,28 @@ fun SettingsView(
     onToggleDesktopDefault: (Boolean) -> Unit,
     isJavaScriptEnabled: Boolean,
     onToggleJavaScript: (Boolean) -> Unit,
+    isLinkPreviewEnabled: Boolean = true,
+    onToggleLinkPreview: (Boolean) -> Unit = {},
     isDoNotTrack: Boolean,
     onToggleDoNotTrack: (Boolean) -> Unit,
     dnsProvider: String = "system",
     dnsCustomValue: String = "",
     onUpdateDnsProvider: (String) -> Unit = {},
     onUpdateDnsCustomValue: (String) -> Unit = {},
+    isDeveloperMode: Boolean = false,
+    isRemoteDebugging: Boolean = false,
+    onSetDeveloperMode: (Boolean) -> Unit = {},
+    onSetRemoteDebugging: (Boolean) -> Unit = {},
     onClearBrowsingData: (clearCache: Boolean, clearHistory: Boolean, clearCookies: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(currentLanguage) { AppStrings(currentLanguage) }
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNameEditDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
+
+    var devTapCount by remember { mutableIntStateOf(0) }
+    var currentToast by remember { mutableStateOf<Toast?>(null) }
 
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -202,7 +219,7 @@ fun SettingsView(
         }
     }
 
-    val tabs = listOf("General", "Appearance", "Privacy", "Browser")
+    val tabs = listOf(strings.tabGeneral, strings.tabAppearance, strings.tabPrivacy, strings.tabBrowser)
 
     BackHandler {
         onDismiss()
@@ -231,12 +248,12 @@ fun SettingsView(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                    contentDescription = "Kembali",
+                                    contentDescription = strings.back,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
-                                    text = "Kembali",
+                                    text = strings.back,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -244,14 +261,14 @@ fun SettingsView(
                         }
 
                         Text(
-                            text = "Settings",
+                            text = strings.settingsTitle,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
                         TextButton(onClick = onDismiss) {
                             Text(
-                                text = "Selesai",
+                                text = strings.done,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -289,6 +306,9 @@ fun SettingsView(
                             ) {
                                 when (currentTab) {
                                     0 -> generalTabContent(
+                                        strings = strings,
+                                        currentLanguage = currentLanguage,
+                                        onSelectLanguage = onSelectLanguage,
                                         currentSearchEngine = currentSearchEngine,
                                         onSelectSearchEngine = onSelectSearchEngine,
                                         userName = userName,
@@ -320,6 +340,7 @@ fun SettingsView(
                                         onPendingCropBitmapChange = { pendingCropBitmap = it }
                                     )
                                     2 -> privacyTabContent(
+                                        strings = strings,
                                         isAdBlockEnabled = isAdBlockEnabled,
                                         onToggleAdBlock = onToggleAdBlock,
                                         isDoNotTrack = isDoNotTrack,
@@ -331,10 +352,22 @@ fun SettingsView(
                                         }
                                     )
                                     3 -> browserTabContent(
+                                        strings = strings,
+                                        context = context,
                                         isDesktopModeDefault = isDesktopModeDefault,
                                         onToggleDesktopDefault = onToggleDesktopDefault,
                                         isJavaScriptEnabled = isJavaScriptEnabled,
                                         onToggleJavaScript = onToggleJavaScript,
+                                        isLinkPreviewEnabled = isLinkPreviewEnabled,
+                                        onToggleLinkPreview = onToggleLinkPreview,
+                                        isDeveloperMode = isDeveloperMode,
+                                        isRemoteDebugging = isRemoteDebugging,
+                                        onSetDeveloperMode = onSetDeveloperMode,
+                                        onSetRemoteDebugging = onSetRemoteDebugging,
+                                        devTapCount = devTapCount,
+                                        onDevTapCountChange = { devTapCount = it },
+                                        currentToast = currentToast,
+                                        onCurrentToastChange = { currentToast = it },
                                         uriHandler = uriHandler
                                     )
                                 }
@@ -468,16 +501,64 @@ fun SettingsView(
 // -------------------------------------------------------------
 
 private fun LazyListScope.generalTabContent(
+    strings: AppStrings,
+    currentLanguage: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
     currentSearchEngine: SearchEngine,
     onSelectSearchEngine: (SearchEngine) -> Unit,
     userName: String,
     onOpenEditName: () -> Unit
 ) {
-    // Card 1: Default Search Engine
+    // Card 1: Language Picker (iOS Grouped Style with Country Flags)
     item {
         IOSCardGroup(
-            header = "DEFAULT SEARCH ENGINE",
-            footer = "Queries typed into the address bar will search with the selected provider."
+            header = strings.languageSettingHeader,
+            footer = strings.languageSettingFooter
+        ) {
+            val languages = listOf(AppLanguage.ID, AppLanguage.EN, AppLanguage.RU)
+            languages.forEachIndexed { index, lang ->
+                val isSelected = currentLanguage == lang
+                IOSSettingsRow(
+                    customIcon = {
+                        CountryFlag(
+                            language = lang,
+                            width = 28.dp,
+                            height = 20.dp,
+                            cornerRadius = 4.dp
+                        )
+                    },
+                    title = when (lang) {
+                        AppLanguage.ID -> "Indonesia"
+                        AppLanguage.EN -> "English (US)"
+                        AppLanguage.RU -> "Русский"
+                    },
+                    subtitle = lang.subtitle,
+                    trailingContent = {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    },
+                    onClick = { onSelectLanguage(lang) }
+                )
+                if (index < languages.size - 1) {
+                    IOSHairlineDivider()
+                }
+            }
+        }
+    }
+
+    item { Spacer(modifier = Modifier.height(20.dp)) }
+
+    // Card 2: Default Search Engine
+    item {
+        IOSCardGroup(
+            header = strings.searchEngineHeader,
+            footer = strings.searchEngineFooter
         ) {
             SearchEngine.values().forEachIndexed { index, engine ->
                 val isSelected = currentSearchEngine == engine
@@ -506,21 +587,21 @@ private fun LazyListScope.generalTabContent(
 
     item { Spacer(modifier = Modifier.height(20.dp)) }
 
-    // Card 2: Personalization
+    // Card 3: Personalization
     item {
         IOSCardGroup(
-            header = "PERSONALIZATION",
-            footer = "Your greeting name appears on the browser home screen."
+            header = strings.greetingNameTitle.uppercase(),
+            footer = strings.greetingNameFooter
         ) {
             IOSSettingsRow(
                 icon = Icons.Default.Person,
                 iconBgColor = Color(0xFFFF9500), // iOS System Orange
-                title = "Greeting Name",
+                title = strings.greetingNameTitle,
                 subtitle = userName,
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Edit",
+                            text = strings.edit,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -540,6 +621,7 @@ private fun LazyListScope.generalTabContent(
 }
 
 private fun LazyListScope.privacyTabContent(
+    strings: AppStrings,
     isAdBlockEnabled: Boolean,
     onToggleAdBlock: (Boolean) -> Unit,
     isDoNotTrack: Boolean,
@@ -550,14 +632,14 @@ private fun LazyListScope.privacyTabContent(
     // Card 1: Content Blocking & Protection
     item {
         IOSCardGroup(
-            header = "CONTENT & PRIVACY PROTECTION",
+            header = strings.contentProtectionHeader,
             footer = "Aura Browser blocks known analytics and ad trackers to protect your privacy and speed up loading."
         ) {
             IOSSettingsRow(
                 icon = Icons.Default.Shield,
                 iconBgColor = Color(0xFF34C759), // iOS System Green
-                title = "Block Ads & Trackers",
-                subtitle = "Filters intrusive ads and trackers",
+                title = strings.blockAdsTitle,
+                subtitle = strings.blockAdsSubtitle,
                 trailingContent = {
                     Switch(
                         checked = isAdBlockEnabled,
@@ -571,8 +653,8 @@ private fun LazyListScope.privacyTabContent(
             IOSSettingsRow(
                 icon = Icons.Default.Security,
                 iconBgColor = Color(0xFF007AFF), // iOS System Blue
-                title = "Do Not Track (DNT)",
-                subtitle = "Sends DNT request header to websites",
+                title = strings.doNotTrackTitle,
+                subtitle = strings.doNotTrackSubtitle,
                 trailingContent = {
                     Switch(
                         checked = isDoNotTrack,
@@ -588,13 +670,13 @@ private fun LazyListScope.privacyTabContent(
     // Card 2: Browsing Data Management
     item {
         IOSCardGroup(
-            header = "BROWSING DATA",
+            header = strings.clearDataTitle.uppercase(),
             footer = "Remove stored browsing history, cached files, or saved cookies from your device."
         ) {
             IOSSettingsRow(
                 icon = Icons.Default.DeleteOutline,
                 iconBgColor = Color(0xFFFF3B30), // iOS System Red
-                title = "Clear Browsing Data",
+                title = strings.clearDataTitle,
                 subtitle = "Stored: ${dataSizeInfo.totalSizeStr} (History, Cache & Cookies)",
                 titleColor = MaterialTheme.colorScheme.error,
                 trailingContent = {
@@ -967,10 +1049,22 @@ private fun LazyListScope.appearanceTabContent(
 }
 
 private fun LazyListScope.browserTabContent(
+    strings: AppStrings,
+    context: Context,
     isDesktopModeDefault: Boolean,
     onToggleDesktopDefault: (Boolean) -> Unit,
     isJavaScriptEnabled: Boolean,
     onToggleJavaScript: (Boolean) -> Unit,
+    isLinkPreviewEnabled: Boolean,
+    onToggleLinkPreview: (Boolean) -> Unit,
+    isDeveloperMode: Boolean,
+    isRemoteDebugging: Boolean,
+    onSetDeveloperMode: (Boolean) -> Unit,
+    onSetRemoteDebugging: (Boolean) -> Unit,
+    devTapCount: Int,
+    onDevTapCountChange: (Int) -> Unit,
+    currentToast: Toast?,
+    onCurrentToastChange: (Toast?) -> Unit,
     uriHandler: androidx.compose.ui.platform.UriHandler
 ) {
     // Card 1: Web Engine
@@ -982,7 +1076,7 @@ private fun LazyListScope.browserTabContent(
             IOSSettingsRow(
                 icon = Icons.Default.Laptop,
                 iconBgColor = Color(0xFF5856D6), // iOS System Indigo
-                title = "Desktop Site by Default",
+                title = strings.desktopDefaultTitle,
                 subtitle = "Always request full desktop pages",
                 trailingContent = {
                     Switch(
@@ -997,7 +1091,7 @@ private fun LazyListScope.browserTabContent(
             IOSSettingsRow(
                 icon = Icons.Default.Code,
                 iconBgColor = Color(0xFFFF9500), // iOS System Orange
-                title = "Enable JavaScript",
+                title = strings.enableJavaScriptTitle,
                 subtitle = "Required for modern web features",
                 trailingContent = {
                     Switch(
@@ -1006,10 +1100,65 @@ private fun LazyListScope.browserTabContent(
                     )
                 }
             )
+
+            IOSHairlineDivider()
+
+            IOSSettingsRow(
+                icon = Icons.Default.Visibility,
+                iconBgColor = Color(0xFF34C759), // iOS System Green
+                title = strings.linkPreviewsTitle,
+                subtitle = strings.linkPreviewsSubtitle,
+                trailingContent = {
+                    Switch(
+                        checked = isLinkPreviewEnabled,
+                        onCheckedChange = onToggleLinkPreview
+                    )
+                }
+            )
         }
     }
 
     item { Spacer(modifier = Modifier.height(20.dp)) }
+
+    // Card Developer (Visible only when developer mode is active)
+    if (isDeveloperMode) {
+        item {
+            IOSCardGroup(
+                header = "DEVELOPER"
+            ) {
+                IOSSettingsRow(
+                    icon = Icons.Default.Terminal,
+                    iconBgColor = Color(0xFF007AFF), // iOS System Blue
+                    title = "Remote Debugging",
+                    subtitle = "Inspect pages with chrome://inspect over USB",
+                    trailingContent = {
+                        Switch(
+                            checked = isRemoteDebugging,
+                            onCheckedChange = onSetRemoteDebugging
+                        )
+                    }
+                )
+
+                IOSHairlineDivider()
+
+                IOSSettingsRow(
+                    icon = Icons.Default.Close,
+                    iconBgColor = MaterialTheme.colorScheme.error,
+                    title = "Turn off developer options",
+                    subtitle = "Hide developer options & disable remote debugging",
+                    onClick = {
+                        onSetDeveloperMode(false)
+                        currentToast?.cancel()
+                        val toast = Toast.makeText(context, "Developer options turned off", Toast.LENGTH_SHORT)
+                        onCurrentToastChange(toast)
+                        toast.show()
+                    }
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(20.dp)) }
+    }
 
     // Card 2: About
     item {
@@ -1021,6 +1170,32 @@ private fun LazyListScope.browserTabContent(
                 iconBgColor = Color(0xFF8E8E93), // iOS System Gray
                 title = "Aura Browser",
                 subtitle = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                onClick = {
+                    if (isDeveloperMode) {
+                        currentToast?.cancel()
+                        val toast = Toast.makeText(context, "No need, you are already a developer.", Toast.LENGTH_SHORT)
+                        onCurrentToastChange(toast)
+                        toast.show()
+                    } else {
+                        val newCount = devTapCount + 1
+                        onDevTapCountChange(newCount)
+                        val remaining = 7 - newCount
+                        if (remaining in 1..4) {
+                            val stepText = if (remaining == 1) "step" else "steps"
+                            currentToast?.cancel()
+                            val toast = Toast.makeText(context, "You are now $remaining $stepText away from being a developer.", Toast.LENGTH_SHORT)
+                            onCurrentToastChange(toast)
+                            toast.show()
+                        } else if (remaining <= 0) {
+                            currentToast?.cancel()
+                            val toast = Toast.makeText(context, "You are now a developer!", Toast.LENGTH_SHORT)
+                            onCurrentToastChange(toast)
+                            toast.show()
+                            onSetDeveloperMode(true)
+                            onDevTapCountChange(0)
+                        }
+                    }
+                },
                 trailingContent = {
                     Text(
                         text = "v${BuildConfig.VERSION_NAME}",
@@ -1106,8 +1281,9 @@ private fun IOSCardGroup(
 
 @Composable
 private fun IOSSettingsRow(
-    icon: ImageVector,
-    iconBgColor: Color,
+    icon: ImageVector? = null,
+    iconBgColor: Color = Color.Transparent,
+    customIcon: (@Composable () -> Unit)? = null,
     title: String,
     subtitle: String? = null,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
@@ -1134,20 +1310,24 @@ private fun IOSSettingsRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            // iOS Vibrant Icon Squircle
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(iconBgColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(17.dp)
-                )
+            if (customIcon != null) {
+                customIcon()
+            } else if (icon != null) {
+                // iOS Vibrant Icon Squircle
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(iconBgColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))

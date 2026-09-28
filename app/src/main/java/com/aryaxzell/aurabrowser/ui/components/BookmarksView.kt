@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.aurabrowser.data.db.BookmarkEntity
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 
 @Composable
 fun IOSHubSegmentedControl(
@@ -90,12 +92,14 @@ fun IOSHubSegmentedControl(
 @Composable
 fun BookmarksView(
     bookmarks: List<BookmarkEntity>,
+    language: AppLanguage = AppLanguage.EN,
     onSelectBookmark: (String) -> Unit,
     onDeleteBookmark: (BookmarkEntity) -> Unit,
     onSwitchToHistory: () -> Unit,
     onSwitchToDownloads: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(language) { AppStrings(language) }
     var searchQuery by remember { mutableStateOf("") }
 
     val filtered = if (searchQuery.isBlank()) {
@@ -134,12 +138,12 @@ fun BookmarksView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Kembali",
+                            contentDescription = strings.back,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = "Kembali",
+                            text = strings.back,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -147,14 +151,14 @@ fun BookmarksView(
                 }
 
                 Text(
-                    text = "Bookmarks",
+                    text = strings.bookmarksTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 TextButton(onClick = onDismiss) {
                     Text(
-                        text = "Selesai",
+                        text = strings.done,
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -165,7 +169,7 @@ fun BookmarksView(
 
             // iOS Segmented Control
             IOSHubSegmentedControl(
-                options = listOf("Bookmarks", "History", "Downloads"),
+                options = listOf(strings.bookmarksTitle, strings.historyTitle, strings.downloadsTitle),
                 selectedOption = 0,
                 onOptionSelected = { index ->
                     when (index) {
@@ -181,7 +185,7 @@ fun BookmarksView(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search bookmarks...") },
+                placeholder = { Text(strings.searchPlaceholder) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -208,7 +212,7 @@ fun BookmarksView(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isEmpty()) "No bookmarks yet" else "No matching bookmarks",
+                        text = strings.noBookmarks,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

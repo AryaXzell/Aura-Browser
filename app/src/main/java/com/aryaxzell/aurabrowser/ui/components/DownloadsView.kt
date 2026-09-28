@@ -75,6 +75,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaxzell.aurabrowser.data.download.DownloadTracker
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 import com.aryaxzell.aurabrowser.data.model.DownloadItem
 import com.aryaxzell.aurabrowser.data.model.DownloadStatus
 
@@ -82,6 +84,7 @@ import com.aryaxzell.aurabrowser.data.model.DownloadStatus
 @Composable
 fun DownloadsView(
     downloads: List<DownloadItem>,
+    language: AppLanguage = AppLanguage.EN,
     onRefresh: () -> Unit,
     onDeleteDownload: (Long) -> Unit,
     onOpenAsTab: () -> Unit,
@@ -89,8 +92,15 @@ fun DownloadsView(
     onSwitchToHistory: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(language) { AppStrings(language) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Semua", "Mengunduh", "Selesai")
+    val tabs = remember(language) {
+        when (language) {
+            AppLanguage.ID -> listOf("Semua", "Mengunduh", "Selesai")
+            AppLanguage.EN -> listOf("All", "Downloading", "Completed")
+            AppLanguage.RU -> listOf("Все", "Загрузка", "Готово")
+        }
+    }
 
     // Intercept back press
     BackHandler {
@@ -120,12 +130,12 @@ fun DownloadsView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Kembali",
+                            contentDescription = strings.back,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = "Kembali",
+                            text = strings.back,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -133,14 +143,14 @@ fun DownloadsView(
                 }
 
                 Text(
-                    text = "Downloads",
+                    text = strings.downloadsTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 TextButton(onClick = onDismiss) {
                     Text(
-                        text = "Selesai",
+                        text = strings.done,
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -151,7 +161,7 @@ fun DownloadsView(
 
             // iOS Segmented Control (Main Tabs)
             IOSHubSegmentedControl(
-                options = listOf("Bookmarks", "History", "Downloads"),
+                options = listOf(strings.bookmarksTitle, strings.historyTitle, strings.downloadsTitle),
                 selectedOption = 2,
                 onOptionSelected = { index ->
                     when (index) {

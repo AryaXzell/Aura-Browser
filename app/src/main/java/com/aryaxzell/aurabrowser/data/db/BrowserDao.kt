@@ -40,4 +40,14 @@ interface BrowserDao {
 
     @Query("DELETE FROM history")
     suspend fun clearAllHistory()
+
+    // Site Settings
+    @Query("SELECT * FROM site_settings")
+    fun getAllSiteSettings(): Flow<List<SiteSettingsEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSiteSettings(siteSettings: SiteSettingsEntity)
+
+    @Query("DELETE FROM site_settings WHERE host = :host")
+    suspend fun deleteSiteSettings(host: String)
 }

@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaxzell.aurabrowser.data.db.BookmarkEntity
 import com.aryaxzell.aurabrowser.data.db.HistoryEntity
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 import com.aryaxzell.aurabrowser.data.model.SearchEngine
 import com.aryaxzell.aurabrowser.data.model.ShortcutItem
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +83,7 @@ import java.util.Calendar
 @Composable
 fun HomepageView(
     userName: String,
+    language: AppLanguage = AppLanguage.EN,
     searchEngine: SearchEngine,
     shortcuts: List<ShortcutItem>,
     recentHistory: List<HistoryEntity>,
@@ -102,7 +105,9 @@ fun HomepageView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val greeting = rememberGreeting()
+    val strings = remember(language) { AppStrings(language) }
+    val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val greetingText = remember(currentHour, userName, language) { strings.getGreeting(currentHour, userName) }
 
     val customIconBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = homeIconUri) {
         value = withContext(Dispatchers.IO) {
@@ -217,7 +222,7 @@ fun HomepageView(
 
         // Time-aware greeting
         Text(
-            text = "$greeting, $userName",
+            text = greetingText,
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -246,13 +251,13 @@ fun HomepageView(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Bookmark,
-                            contentDescription = "Bookmarks",
+                            contentDescription = strings.bookmarksTitle,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Bookmarks",
+                            text = strings.bookmarksTitle,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -276,13 +281,13 @@ fun HomepageView(
                     ) {
                         Icon(
                             imageVector = Icons.Default.History,
-                            contentDescription = "History",
+                            contentDescription = strings.historyTitle,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "History",
+                            text = strings.historyTitle,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -306,13 +311,13 @@ fun HomepageView(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Download,
-                            contentDescription = "Downloads",
+                            contentDescription = strings.downloadsTitle,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Downloads",
+                            text = strings.downloadsTitle,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -331,7 +336,7 @@ fun HomepageView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Shortcuts",
+                    text = strings.shortcutsTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onBackground
                 )

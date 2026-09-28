@@ -30,6 +30,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import com.aryaxzell.aurabrowser.data.db.SiteSettingsEntity
+import com.aryaxzell.aurabrowser.data.model.ConsoleLogEntry
+import com.aryaxzell.aurabrowser.data.model.NetworkLogEntry
+import com.aryaxzell.aurabrowser.data.model.SecurityInfo
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.map
+
 class BrowserViewModel(application: Application) : AndroidViewModel(application) {
     private val db = BrowserDatabase.getInstance(application)
     private val dao = db.browserDao()
@@ -52,6 +59,141 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val isJavaScriptEnabled: StateFlow<Boolean> = preferences.isJavaScriptEnabledFlow
     val isDoNotTrackEnabled: StateFlow<Boolean> = preferences.isDoNotTrackEnabledFlow
     val lastSeenOnboardingVersionCode: StateFlow<Int> = preferences.lastSeenOnboardingVersionCodeFlow
+    val isDeveloperMode: StateFlow<Boolean> = preferences.isDeveloperModeFlow
+    val isRemoteDebugging: StateFlow<Boolean> = preferences.isRemoteDebuggingFlow
+    val isLinkPreviewEnabled: StateFlow<Boolean> = preferences.isLinkPreviewEnabledFlow
+    val appLanguage: StateFlow<com.aryaxzell.aurabrowser.data.model.AppLanguage> = preferences.appLanguageFlow
+
+    fun updateAppLanguage(language: com.aryaxzell.aurabrowser.data.model.AppLanguage) {
+        preferences.appLanguage = language
+    }
+
+    data class LinkPreviewTarget(
+        val url: String,
+        val isSourceIncognito: Boolean,
+        val title: String? = null
+    )
+
+    private val _linkPreviewTarget = MutableStateFlow<LinkPreviewTarget?>(null)
+    val linkPreviewTarget: StateFlow<LinkPreviewTarget?> = _linkPreviewTarget.asStateFlow()
+
+    fun showLinkPreview(url: String, isSourceIncognito: Boolean, title: String? = null) {
+        if (url.isNotBlank() && (url.startsWith("http://") || url.startsWith("https://"))) {
+            _linkPreviewTarget.value = LinkPreviewTarget(url = url, isSourceIncognito = isSourceIncognito, title = title)
+        }
+    }
+
+    fun dismissLinkPreview() {
+        _linkPreviewTarget.value = null
+    }
+
+    fun updateLinkPreviewEnabled(enabled: Boolean) {
+        preferences.isLinkPreviewEnabled = enabled
+    }
+
+    fun setDeveloperMode(enabled: Boolean) {
+        preferences.isDeveloperMode = enabled
+        if (!enabled) {
+            preferences.isRemoteDebugging = false
+            consoleLogBuffers.clear()
+        }
+    }
+
+    fun setRemoteDebugging(enabled: Boolean) {
+        preferences.isRemoteDebugging = enabled
+    }
+
+    // Site Settings Room persistence
+    val siteSettingsMap: StateFlow<Map<String, SiteSettingsEntity>> = dao.getAllSiteSettings()
+        .map { list -> list.associateBy { it.host } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun updateSiteSettings(host: String, javascript: Int, desktop: Int, adBlock: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertSiteSettings(SiteSettingsEntity(host, javascript, desktop, adBlock))
+        }
+    }
+
+    fun resetSiteSettings(host: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteSiteSettings(host)
+        }
+    }
+
+    // Security Info map (tabId -> SecurityInfo)
+    private val _securityInfoMap = MutableStateFlow<Map<String, SecurityInfo>>(emptyMap())
+    val securityInfoMap: StateFlow<Map<String, SecurityInfo>> = _securityInfoMap.asStateFlow()
+
+    fun updateSecurityInfo(tabId: String, info: SecurityInfo) {
+        _securityInfoMap.update { it + (tabId to info) }
+    }
+
+    // Ring buffers (max 500 entries per tab)
+    private val networkLogBuffers = ConcurrentHashMap<String, java.util.ArrayDeque<NetworkLogEntry>>()
+    private val consoleLogBuffers = ConcurrentHashMap<String, java.util.ArrayDeque<ConsoleLogEntry>>()
+    private val _networkLogUpdateTrigger = MutableStateFlow(0L)
+    val networkLogUpdateTrigger: StateFlow<Long> = _networkLogUpdateTrigger.asStateFlow()
+
+    fun addNetworkLogEntry(tabId: String, entry: NetworkLogEntry) {
+        val deque = networkLogBuffers.getOrPut(tabId) { java.util.ArrayDeque() }
+        synchronized(deque) {
+            if (deque.size >= 500) deque.removeFirst()
+            deque.addLast(entry)
+        }
+    }
+
+    fun getNetworkLogs(tabId: String): List<NetworkLogEntry> {
+        val deque = networkLogBuffers[tabId] ?: return emptyList()
+        return synchronized(deque) { deque.toList() }
+    }
+
+    fun clearNetworkLogs(tabId: String) {
+        networkLogBuffers[tabId]?.clear()
+        _networkLogUpdateTrigger.value = System.currentTimeMillis()
+    }
+
+    fun addConsoleLogEntry(tabId: String, entry: ConsoleLogEntry) {
+        if (!preferences.isDeveloperMode) return
+        val deque = consoleLogBuffers.getOrPut(tabId) { java.util.ArrayDeque() }
+        synchronized(deque) {
+            if (deque.size >= 500) deque.removeFirst()
+            deque.addLast(entry)
+        }
+    }
+
+    fun getConsoleLogs(tabId: String): List<ConsoleLogEntry> {
+        val deque = consoleLogBuffers[tabId] ?: return emptyList()
+        return synchronized(deque) { deque.toList() }
+    }
+
+    fun clearConsoleLogs(tabId: String) {
+        consoleLogBuffers[tabId]?.clear()
+    }
+
+    private fun clearAllConsoleLogs() {
+        consoleLogBuffers.clear()
+    }
+
+    // Sheet / Dialog states
+    private val _showSiteInfoSheet = MutableStateFlow(false)
+    val showSiteInfoSheet: StateFlow<Boolean> = _showSiteInfoSheet.asStateFlow()
+
+    fun setShowSiteInfoSheet(show: Boolean) { _showSiteInfoSheet.value = show }
+
+    private val _showPageSourceView = MutableStateFlow(false)
+    val showPageSourceView: StateFlow<Boolean> = _showPageSourceView.asStateFlow()
+
+    fun setShowPageSourceView(show: Boolean) { _showPageSourceView.value = show }
+
+    private val _showNetworkLogView = MutableStateFlow(false)
+    val showNetworkLogView: StateFlow<Boolean> = _showNetworkLogView.asStateFlow()
+
+    fun setShowNetworkLogView(show: Boolean) { _showNetworkLogView.value = show }
+
+    private val _showConsoleLogView = MutableStateFlow(false)
+    val showConsoleLogView: StateFlow<Boolean> = _showConsoleLogView.asStateFlow()
+
+    fun setShowConsoleLogView(show: Boolean) { _showConsoleLogView.value = show }
 
     fun updateLastSeenOnboardingVersionCode(code: Int) {
         preferences.lastSeenOnboardingVersionCode = code
@@ -358,6 +500,34 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun toggleBookmarkCurrentTab() {
         toggleBookmark()
+    }
+
+    fun toggleBookmarkForUrl(url: String, title: String? = null, onResult: ((Boolean) -> Unit)? = null) {
+        if (url.isBlank()) return
+        viewModelScope.launch {
+            val isBookmarked = bookmarks.value.any { it.url == url }
+            if (isBookmarked) {
+                dao.deleteBookmarkByUrl(url)
+                withContext(Dispatchers.Main) {
+                    onResult?.invoke(false)
+                }
+            } else {
+                val displayTitle = title?.ifBlank { null } ?: try {
+                    android.net.Uri.parse(url).host?.removePrefix("www.") ?: url
+                } catch (e: Exception) {
+                    url
+                }
+                dao.insertBookmark(
+                    BookmarkEntity(
+                        title = displayTitle,
+                        url = url
+                    )
+                )
+                withContext(Dispatchers.Main) {
+                    onResult?.invoke(true)
+                }
+            }
+        }
     }
 
     fun deleteBookmark(bookmark: BookmarkEntity) {

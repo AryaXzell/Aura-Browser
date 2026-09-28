@@ -19,6 +19,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +75,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aryaxzell.aurabrowser.BuildConfig
+import com.aryaxzell.aurabrowser.data.localization.AppStrings
+import com.aryaxzell.aurabrowser.data.model.AppLanguage
 import com.aryaxzell.aurabrowser.data.model.WhatsNewData
 import com.aryaxzell.aurabrowser.data.model.WhatsNewEntry
 
@@ -82,12 +86,15 @@ fun OnboardingView(
     currentVersionCode: Int = BuildConfig.VERSION_CODE,
     currentThemeMode: String,
     currentAccentColor: String,
+    currentLanguage: AppLanguage = AppLanguage.EN,
     onSelectThemeMode: (String) -> Unit,
     onSelectAccentColor: (String) -> Unit,
+    onSelectLanguage: (AppLanguage) -> Unit = {},
     onCompleteOnboarding: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val strings = remember(currentLanguage) { AppStrings(currentLanguage) }
     val isWhatsNewOnly = remember(lastSeenVersionCode) { lastSeenVersionCode > 0 }
 
     val whatsNewList = remember(lastSeenVersionCode, currentVersionCode) {
@@ -155,6 +162,9 @@ fun OnboardingView(
             ) { step ->
                 when (step) {
                     "welcome" -> WelcomeStep(
+                        strings = strings,
+                        selectedLanguage = currentLanguage,
+                        onSelectLanguage = onSelectLanguage,
                         onGetStarted = {
                             if (currentStepIndex + 1 < steps.size) {
                                 currentStepIndex++
@@ -165,6 +175,7 @@ fun OnboardingView(
                     )
 
                     "whats_new" -> WhatsNewStep(
+                        strings = strings,
                         entries = whatsNewList,
                         isStandalone = isWhatsNewOnly,
                         onContinue = {
@@ -177,6 +188,7 @@ fun OnboardingView(
                     )
 
                     "permissions" -> PermissionsStep(
+                        strings = strings,
                         context = context,
                         onContinue = {
                             if (currentStepIndex + 1 < steps.size) {
@@ -188,6 +200,7 @@ fun OnboardingView(
                     )
 
                     "customization" -> CustomizationStep(
+                        strings = strings,
                         themeMode = currentThemeMode,
                         accentColor = currentAccentColor,
                         onSelectThemeMode = onSelectThemeMode,
@@ -232,23 +245,28 @@ private fun StepProgressBar(
 // -------------------------------------------------------------
 @Composable
 private fun WelcomeStep(
+    strings: AppStrings,
+    selectedLanguage: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
     onGetStarted: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(26.dp))
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -259,61 +277,85 @@ private fun WelcomeStep(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                AuraVectorLogo(modifier = Modifier.size(54.dp))
+                AuraVectorLogo(modifier = Modifier.size(50.dp))
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Welcome to Aura",
+                text = strings.welcomeTitle,
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp
+                    fontSize = 28.sp
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Fast, Private & Customizable Web Browser",
+                text = strings.welcomeSubtitle,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = 16.sp,
-                    lineHeight = 22.sp
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-        }
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                WelcomeFeatureRow(
-                    icon = Icons.Default.Security,
-                    iconBg = Color(0xFF34C759),
-                    title = "Built-in Privacy",
-                    description = "Block trackers and intrusive ads automatically."
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // iOS Styled Language Picker
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = strings.selectLanguage.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.5.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                 )
-                WelcomeFeatureRow(
-                    icon = Icons.Default.Palette,
-                    iconBg = Color(0xFF007AFF),
-                    title = "Personalized Themes",
-                    description = "Custom wallpapers, accent colors and widgets."
+
+                IosLanguagePicker(
+                    selectedLanguage = selectedLanguage,
+                    onSelectLanguage = onSelectLanguage
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Quick Features Summary Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    WelcomeFeatureRow(
+                        icon = Icons.Default.Security,
+                        iconBg = Color(0xFF34C759),
+                        title = strings.builtInPrivacyTitle,
+                        description = strings.builtInPrivacyDesc
+                    )
+                    WelcomeFeatureRow(
+                        icon = Icons.Default.Palette,
+                        iconBg = Color(0xFF007AFF),
+                        title = strings.personalizedThemesTitle,
+                        description = strings.personalizedThemesDesc
+                    )
+                }
+            }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         Button(
             onClick = onGetStarted,
@@ -332,7 +374,7 @@ private fun WelcomeStep(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Get Started",
+                    text = strings.getStarted,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -391,6 +433,7 @@ private fun WelcomeFeatureRow(
 // -------------------------------------------------------------
 @Composable
 private fun WhatsNewStep(
+    strings: AppStrings,
     entries: List<WhatsNewEntry>,
     isStandalone: Boolean,
     onContinue: () -> Unit
@@ -496,6 +539,7 @@ private fun WhatsNewStep(
 // -------------------------------------------------------------
 @Composable
 private fun PermissionsStep(
+    strings: AppStrings,
     context: Context,
     onContinue: () -> Unit
 ) {
@@ -803,6 +847,7 @@ private fun PermissionsStep(
 // -------------------------------------------------------------
 @Composable
 private fun CustomizationStep(
+    strings: AppStrings,
     themeMode: String,
     accentColor: String,
     onSelectThemeMode: (String) -> Unit,

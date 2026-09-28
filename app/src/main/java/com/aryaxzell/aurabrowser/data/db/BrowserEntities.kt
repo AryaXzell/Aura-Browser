@@ -20,3 +20,12 @@ data class HistoryEntity(
     val url: String,
     val visitedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "site_settings")
+data class SiteSettingsEntity(
+    @PrimaryKey
+    val host: String, // Host without www., e.g., "example.com"
+    val javascript: Int = 0, // 0: Default, 1: On, 2: Off
+    val desktop: Int = 0,    // 0: Default, 1: On, 2: Off
+    val adBlock: Int = 0     // 0: Default, 1: On, 2: Off
+)

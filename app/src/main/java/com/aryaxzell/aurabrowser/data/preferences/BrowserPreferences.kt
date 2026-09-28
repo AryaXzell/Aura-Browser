@@ -33,8 +33,69 @@ class BrowserPreferences(context: Context) {
         private const val KEY_SHORTCUTS = "pref_shortcuts"
         private const val KEY_DNS_PROVIDER = "pref_dns_provider"
         private const val KEY_DNS_CUSTOM_VALUE = "pref_dns_custom_value"
-        private const val KEY_LAST_SEEN_ONBOARDING_VERSION_CODE = "pref_last_seen_onboarding_version_code"
+        const val KEY_LAST_SEEN_ONBOARDING_VERSION_CODE = "pref_last_seen_onboarding_version_code"
+        private const val KEY_DEVELOPER_MODE = "pref_developer_mode"
+        private const val KEY_REMOTE_DEBUGGING = "pref_remote_debugging"
+        private const val KEY_LINK_PREVIEW_ENABLED = "pref_link_preview_enabled"
+        private const val KEY_APP_LANGUAGE = "pref_app_language"
     }
+
+    private val _appLanguage = MutableStateFlow(loadAppLanguage())
+    val appLanguageFlow: StateFlow<com.aryaxzell.aurabrowser.data.model.AppLanguage> = _appLanguage.asStateFlow()
+    var appLanguage: com.aryaxzell.aurabrowser.data.model.AppLanguage
+        get() = _appLanguage.value
+        set(value) {
+            prefs.edit().putString(KEY_APP_LANGUAGE, value.code).apply()
+            _appLanguage.value = value
+        }
+
+    private fun loadAppLanguage(): com.aryaxzell.aurabrowser.data.model.AppLanguage {
+        val saved = prefs.getString(KEY_APP_LANGUAGE, null)
+        if (saved != null) {
+            return com.aryaxzell.aurabrowser.data.model.AppLanguage.fromCode(saved)
+        }
+        val defaultLocale = java.util.Locale.getDefault().language.lowercase()
+        return when {
+            defaultLocale.startsWith("id") || defaultLocale.startsWith("in") -> com.aryaxzell.aurabrowser.data.model.AppLanguage.ID
+            defaultLocale.startsWith("ru") -> com.aryaxzell.aurabrowser.data.model.AppLanguage.RU
+            else -> com.aryaxzell.aurabrowser.data.model.AppLanguage.EN
+        }
+    }
+
+    private val _isLinkPreviewEnabled = MutableStateFlow(
+        if (prefs.contains(KEY_LINK_PREVIEW_ENABLED)) {
+            prefs.getBoolean(KEY_LINK_PREVIEW_ENABLED, true)
+        } else {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val isLowRam = am?.isLowRamDevice == true
+            !isLowRam
+        }
+    )
+    val isLinkPreviewEnabledFlow: StateFlow<Boolean> = _isLinkPreviewEnabled.asStateFlow()
+    var isLinkPreviewEnabled: Boolean
+        get() = _isLinkPreviewEnabled.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_LINK_PREVIEW_ENABLED, value).apply()
+            _isLinkPreviewEnabled.value = value
+        }
+
+    private val _isDeveloperMode = MutableStateFlow(prefs.getBoolean(KEY_DEVELOPER_MODE, false))
+    val isDeveloperModeFlow: StateFlow<Boolean> = _isDeveloperMode.asStateFlow()
+    var isDeveloperMode: Boolean
+        get() = _isDeveloperMode.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_DEVELOPER_MODE, value).apply()
+            _isDeveloperMode.value = value
+        }
+
+    private val _isRemoteDebugging = MutableStateFlow(prefs.getBoolean(KEY_REMOTE_DEBUGGING, false))
+    val isRemoteDebuggingFlow: StateFlow<Boolean> = _isRemoteDebugging.asStateFlow()
+    var isRemoteDebugging: Boolean
+        get() = _isRemoteDebugging.value
+        set(value) {
+            prefs.edit().putBoolean(KEY_REMOTE_DEBUGGING, value).apply()
+            _isRemoteDebugging.value = value
+        }
 
     private val _lastSeenOnboardingVersionCode = MutableStateFlow(prefs.getInt(KEY_LAST_SEEN_ONBOARDING_VERSION_CODE, 0))
     val lastSeenOnboardingVersionCodeFlow: StateFlow<Int> = _lastSeenOnboardingVersionCode.asStateFlow()

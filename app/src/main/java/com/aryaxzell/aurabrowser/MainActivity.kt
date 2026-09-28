@@ -49,8 +49,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +76,12 @@ import com.aryaxzell.aurabrowser.ui.components.TabSwitcherView
 import com.aryaxzell.aurabrowser.ui.theme.MyApplicationTheme
 import com.aryaxzell.aurabrowser.viewmodel.BrowserViewModel
 import kotlinx.coroutines.launch
+
+import com.aryaxzell.aurabrowser.ui.components.ConsoleLogView
+import com.aryaxzell.aurabrowser.ui.components.NetworkLogView
+import com.aryaxzell.aurabrowser.ui.components.PageSourceView
+import com.aryaxzell.aurabrowser.ui.components.ResourceTiming
+import com.aryaxzell.aurabrowser.ui.components.SiteInfoSheet
 
 class MainActivity : ComponentActivity() {
     private val viewModel: BrowserViewModel by viewModels()
@@ -128,6 +136,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+            val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
             val lastSeenVersionCode by viewModel.lastSeenOnboardingVersionCode.collectAsStateWithLifecycle()
 
             val isDarkTheme = when (themeMode) {
@@ -167,8 +176,10 @@ class MainActivity : ComponentActivity() {
                             lastSeenVersionCode = lastSeenVersionCode,
                             currentThemeMode = themeMode,
                             currentAccentColor = accentColor,
+                            currentLanguage = appLanguage,
                             onSelectThemeMode = { viewModel.updateThemeMode(it) },
                             onSelectAccentColor = { viewModel.updateAccentColor(it) },
+                            onSelectLanguage = { viewModel.updateAppLanguage(it) },
                             onCompleteOnboarding = {
                                 viewModel.updateLastSeenOnboardingVersionCode(BuildConfig.VERSION_CODE)
                             }
@@ -210,6 +221,7 @@ fun BrowserApp(
 
     // Reactive preferences
     val searchEngine by viewModel.searchEngine.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val showShortcuts by viewModel.showShortcuts.collectAsStateWithLifecycle()
@@ -234,12 +246,25 @@ fun BrowserApp(
     val isEditingUrl by viewModel.isEditingUrl.collectAsStateWithLifecycle()
     val searchSuggestions by viewModel.searchSuggestions.collectAsStateWithLifecycle()
 
+    val isDeveloperMode by viewModel.isDeveloperMode.collectAsStateWithLifecycle()
+    val isRemoteDebugging by viewModel.isRemoteDebugging.collectAsStateWithLifecycle()
+    val isLinkPreviewEnabled by viewModel.isLinkPreviewEnabled.collectAsStateWithLifecycle()
+    val linkPreviewTarget by viewModel.linkPreviewTarget.collectAsStateWithLifecycle()
+    val siteSettingsMap by viewModel.siteSettingsMap.collectAsStateWithLifecycle()
+    val securityInfoMap by viewModel.securityInfoMap.collectAsStateWithLifecycle()
+    val networkLogTrigger by viewModel.networkLogUpdateTrigger.collectAsStateWithLifecycle()
+
     val showTabSwitcher by viewModel.showTabSwitcher.collectAsStateWithLifecycle()
     val showBookmarksSheet by viewModel.showBookmarksSheet.collectAsStateWithLifecycle()
     val showHistorySheet by viewModel.showHistorySheet.collectAsStateWithLifecycle()
     val showDownloadsSheet by viewModel.showDownloadsSheet.collectAsStateWithLifecycle()
     val showSettingsSheet by viewModel.showSettingsSheet.collectAsStateWithLifecycle()
     val showAddShortcutDialog by viewModel.showAddShortcutDialog.collectAsStateWithLifecycle()
+
+    val showSiteInfoSheet by viewModel.showSiteInfoSheet.collectAsStateWithLifecycle()
+    val showPageSourceView by viewModel.showPageSourceView.collectAsStateWithLifecycle()
+    val showNetworkLogView by viewModel.showNetworkLogView.collectAsStateWithLifecycle()
+    val showConsoleLogView by viewModel.showConsoleLogView.collectAsStateWithLifecycle()
 
     val webAction by viewModel.webAction.collectAsStateWithLifecycle()
     val downloads by viewModel.downloads.collectAsStateWithLifecycle()
@@ -265,9 +290,11 @@ fun BrowserApp(
                 themeColor = activeTab.themeColor,
                 isEditingUrl = isEditingUrl,
                 urlInput = urlInput,
+                securityInfo = securityInfoMap[activeTab.id],
+                isDeveloperMode = isDeveloperMode,
                 onUrlInputChange = { viewModel.updateUrlInput(it) },
                 onStartEditingUrl = { viewModel.setIsEditingUrl(true) },
-                onSubmitUrl = { viewModel.loadUrl(it) },
+                onSubmitUrl = { viewModel.submitQueryOrUrl(it) },
                 onCancelEditingUrl = { viewModel.cancelEditingUrl() },
                 onReload = { viewModel.reload() },
                 onStop = { viewModel.stop() },
@@ -288,7 +315,11 @@ fun BrowserApp(
                         }
                         context.startActivity(Intent.createChooser(shareIntent, "Share URL"))
                     }
-                }
+                },
+                onOpenSiteInfo = { viewModel.setShowSiteInfoSheet(true) },
+                onOpenPageSource = { viewModel.setShowPageSourceView(true) },
+                onOpenNetworkLog = { viewModel.setShowNetworkLogView(true) },
+                onOpenConsoleLog = { viewModel.setShowConsoleLogView(true) }
             )
         },
         bottomBar = {
@@ -369,6 +400,9 @@ fun BrowserApp(
                         isAdBlockEnabled = isAdBlockEnabled,
                         isJavaScriptEnabled = isJavaScriptEnabled,
                         isDoNotTrack = isDoNotTrackEnabled,
+                        isDeveloperMode = isDeveloperMode,
+                        isRemoteDebugging = isRemoteDebugging,
+                        siteSettingsMap = siteSettingsMap,
                         webAction = webAction,
                         onActionConsumed = { viewModel.consumeWebAction() },
                         onPageStarted = { tabId, url -> viewModel.onPageStarted(tabId, url) },
@@ -382,6 +416,12 @@ fun BrowserApp(
                         onReceivedError = { tabId, desc, isOffline -> viewModel.onReceivedError(tabId, desc, isOffline) },
                         onFaviconReceived = { tabId, favicon -> viewModel.onFaviconReceived(tabId, favicon) },
                         onThemeColorReceived = { tabId, color -> viewModel.onThemeColorReceived(tabId, color) },
+                        onUpdateSecurityInfo = { tabId, info -> viewModel.updateSecurityInfo(tabId, info) },
+                        onAddNetworkLogEntry = { tabId, entry -> viewModel.addNetworkLogEntry(tabId, entry) },
+                        onAddConsoleLogEntry = { tabId, entry -> viewModel.addConsoleLogEntry(tabId, entry) },
+                        onLinkLongPress = { targetUrl, isIncognito ->
+                            viewModel.showLinkPreview(targetUrl, isIncognito)
+                        },
                         onShowFileChooser = onShowFileChooser,
                         onRetry = { viewModel.goHome() }
                     )
@@ -543,6 +583,8 @@ fun BrowserApp(
         exit = slideOut
     ) {
         SettingsView(
+            currentLanguage = appLanguage,
+            onSelectLanguage = { viewModel.updateAppLanguage(it) },
             currentSearchEngine = searchEngine,
             onSelectSearchEngine = { viewModel.updateSearchEngine(it) },
             userName = viewModel.preferences.userName,
@@ -571,16 +613,135 @@ fun BrowserApp(
             onToggleDesktopDefault = { viewModel.updateDesktopModeDefault(it) },
             isJavaScriptEnabled = isJavaScriptEnabled,
             onToggleJavaScript = { viewModel.updateJavaScript(it) },
+            isLinkPreviewEnabled = isLinkPreviewEnabled,
+            onToggleLinkPreview = { viewModel.updateLinkPreviewEnabled(it) },
             isDoNotTrack = isDoNotTrackEnabled,
             onToggleDoNotTrack = { viewModel.updateDoNotTrack(it) },
             dnsProvider = dnsProvider,
             dnsCustomValue = dnsCustomValue,
             onUpdateDnsProvider = { viewModel.updateDnsProvider(it) },
             onUpdateDnsCustomValue = { viewModel.updateDnsCustomValue(it) },
+            isDeveloperMode = isDeveloperMode,
+            isRemoteDebugging = isRemoteDebugging,
+            onSetDeveloperMode = { viewModel.setDeveloperMode(it) },
+            onSetRemoteDebugging = { viewModel.setRemoteDebugging(it) },
             onClearBrowsingData = { clearCache, clearHistory, clearCookies ->
                 viewModel.clearBrowsingData(clearCache, clearHistory, clearCookies)
             },
             onDismiss = { viewModel.setSettingsSheetVisible(false) }
+        )
+    }
+
+    // Site Info Sheet
+    if (showSiteInfoSheet) {
+        val activeHost = remember(activeTab.url) {
+            try {
+                Uri.parse(activeTab.url).host?.lowercase()?.removePrefix("www.") ?: ""
+            } catch (e: Exception) { "" }
+        }
+
+        SiteInfoSheet(
+            url = activeTab.url,
+            securityInfo = securityInfoMap[activeTab.id],
+            siteSettings = siteSettingsMap[activeHost],
+            onUpdateSiteSettings = { js, desktop, adBlock ->
+                viewModel.updateSiteSettings(activeHost, js, desktop, adBlock)
+            },
+            onResetSiteSettings = {
+                viewModel.resetSiteSettings(activeHost)
+            },
+            onReloadPage = {
+                viewModel.reload()
+            },
+            onDismiss = { viewModel.setShowSiteInfoSheet(false) }
+        )
+    }
+
+    // Page Source View
+    if (showPageSourceView) {
+        var renderedDom by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(Unit) {
+            val safeWebView = viewModel.webViewPoolManager.getWebView(activeTab.id)
+            safeWebView?.evaluateJavascript("document.documentElement.outerHTML") { rawResult: String? ->
+                if (!rawResult.isNullOrBlank() && rawResult != "null") {
+                    try {
+                        val clean = org.json.JSONTokener(rawResult).nextValue().toString()
+                        renderedDom = clean
+                    } catch (e: Exception) {
+                        renderedDom = rawResult
+                    }
+                }
+            }
+        }
+
+        PageSourceView(
+            url = activeTab.url,
+            isDesktopMode = activeTab.isDesktopMode,
+            renderedHtml = renderedDom,
+            onDismiss = { viewModel.setShowPageSourceView(false) }
+        )
+    }
+
+    // Network Log View
+    if (showNetworkLogView) {
+        NetworkLogView(
+            logs = remember(networkLogTrigger, activeTab.id) { viewModel.getNetworkLogs(activeTab.id) },
+            onRequestResourceTimings = { onResult ->
+                val safeWebView = viewModel.webViewPoolManager.getWebView(activeTab.id)
+                safeWebView?.evaluateJavascript(
+                    """
+                    (function() {
+                        var entries = performance.getEntriesByType('resource');
+                        return JSON.stringify(entries.map(function(e) {
+                            return {
+                                name: e.name,
+                                durationMs: Math.round(e.duration),
+                                transferSize: e.transferSize || null,
+                                protocol: e.nextHopProtocol || null,
+                                initiatorType: e.initiatorType || null
+                            };
+                        }));
+                    })()
+                    """.trimIndent()
+                ) { rawResult: String? ->
+                    if (!rawResult.isNullOrBlank() && rawResult != "null") {
+                        try {
+                            val cleanJson = org.json.JSONTokener(rawResult).nextValue().toString()
+                            val array = org.json.JSONArray(cleanJson)
+                            val list = mutableListOf<ResourceTiming>()
+                            for (i in 0 until array.length()) {
+                                val obj = array.getJSONObject(i)
+                                list.add(
+                                    ResourceTiming(
+                                        name = obj.optString("name"),
+                                        durationMs = if (obj.has("durationMs") && !obj.isNull("durationMs")) obj.getLong("durationMs") else null,
+                                        transferSize = if (obj.has("transferSize") && !obj.isNull("transferSize")) obj.getLong("transferSize") else null,
+                                        protocol = obj.optString("protocol").takeIf { it.isNotBlank() },
+                                        initiatorType = obj.optString("initiatorType").takeIf { it.isNotBlank() }
+                                    )
+                                )
+                            }
+                            onResult(list)
+                        } catch (e: Exception) {
+                            onResult(emptyList())
+                        }
+                    } else {
+                        onResult(emptyList())
+                    }
+                }
+            },
+            onClearLogs = { viewModel.clearNetworkLogs(activeTab.id) },
+            onDismiss = { viewModel.setShowNetworkLogView(false) }
+        )
+    }
+
+    // Console Log View
+    if (showConsoleLogView) {
+        ConsoleLogView(
+            logs = remember(activeTab.id) { viewModel.getConsoleLogs(activeTab.id) },
+            onClearLogs = { viewModel.clearConsoleLogs(activeTab.id) },
+            onDismiss = { viewModel.setShowConsoleLogView(false) }
         )
     }
 
@@ -591,6 +752,59 @@ fun BrowserApp(
                 viewModel.addShortcut(title, url)
             },
             onDismiss = { viewModel.setAddShortcutDialogVisible(false) }
+        )
+    }
+
+    // Link Preview Overlay & Context Menu
+    linkPreviewTarget?.let { target ->
+        val targetIsBookmarked = remember(bookmarks, target.url) {
+            bookmarks.any { it.url == target.url }
+        }
+
+        com.aryaxzell.aurabrowser.ui.components.LinkPreviewOverlay(
+            target = target,
+            isLinkPreviewEnabled = isLinkPreviewEnabled,
+            isBookmarked = targetIsBookmarked,
+            adBlockEngine = viewModel.adBlockEngine,
+            isAdBlockEnabled = isAdBlockEnabled,
+            isDoNotTrack = isDoNotTrackEnabled,
+            onOpen = {
+                viewModel.loadUrl(target.url)
+                viewModel.dismissLinkPreview()
+            },
+            onOpenInNewTab = {
+                viewModel.createNewTab(url = target.url, isIncognito = target.isSourceIncognito)
+                viewModel.dismissLinkPreview()
+            },
+            onOpenInIncognitoTab = {
+                viewModel.createNewTab(url = target.url, isIncognito = true)
+                viewModel.dismissLinkPreview()
+            },
+            onDownload = {
+                viewModel.downloadTracker.enqueueDownload(url = target.url)
+                viewModel.dismissLinkPreview()
+            },
+            onToggleBookmark = {
+                viewModel.toggleBookmarkForUrl(target.url, target.title) { isAdded ->
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isAdded) "Added to bookmarks" else "Removed from bookmarks",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                viewModel.dismissLinkPreview()
+            },
+            onCopyLink = {
+                com.aryaxzell.aurabrowser.data.util.ClipboardUtil.copyToClipboard(context, "Link", target.url)
+                viewModel.dismissLinkPreview()
+            },
+            onShare = {
+                com.aryaxzell.aurabrowser.data.util.ShareUtil.shareUrl(context, target.url, target.title)
+                viewModel.dismissLinkPreview()
+            },
+            onDismiss = {
+                viewModel.dismissLinkPreview()
+            }
         )
     }
 }

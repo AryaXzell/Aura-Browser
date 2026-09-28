@@ -20,6 +20,36 @@ class DownloadTracker(private val context: Context) {
         ownedIdsPrefs.edit().putStringSet("ids", current).apply()
     }
 
+    fun enqueueDownload(
+        url: String,
+        userAgent: String? = null,
+        contentDisposition: String? = null,
+        mimeType: String? = null
+    ) {
+        try {
+            val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType)
+            val request = DownloadManager.Request(Uri.parse(url)).apply {
+                if (!mimeType.isNullOrBlank()) {
+                    setMimeType(mimeType)
+                }
+                if (!userAgent.isNullOrBlank()) {
+                    addRequestHeader("User-Agent", userAgent)
+                }
+                setTitle(filename)
+                setDescription("Downloading with Aura Browser")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, filename)
+            }
+            val downloadId = downloadManager?.enqueue(request)
+            if (downloadId != null) {
+                registerOwnedDownload(downloadId)
+                Toast.makeText(context, "Download started: $filename", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Unable to start download: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun getDownloads(): List<DownloadItem> {
         val dm = downloadManager ?: return emptyList()
         val ownedIds = ownedIdsPrefs.getStringSet("ids", emptySet())
